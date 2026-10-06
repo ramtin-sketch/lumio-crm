@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LUMIO Vertriebszentrale</title>
+<meta name="description" content="LUMIO Vertriebszentrale – Demo mit erfundenen Daten">
+<meta name="theme-color" content="#0E1523">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LUMIO">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%230E1523'/%3E%3Cpath d='M170 128h66v192h118v64H170z' fill='%23fff'/%3E%3Ccircle cx='350' cy='168' r='38' fill='%232244CC'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<script>
+  /* Hell/Dunkel: eigene Wahl in der App, sonst die des Betrachters (data-theme), sonst das System */
+  (function(){
+    var root = document.documentElement, mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function eigen(){ try { return localStorage.getItem('lumio-theme'); } catch (e) { return null; } }
+    function anwenden(){
+      var e = eigen(), dt = root.getAttribute('data-theme');
+      root.classList.toggle('dark', e ? e === 'dark' : (dt ? dt === 'dark' : mq.matches));
+    }
+    anwenden();
+    try { mq.addEventListener('change', anwenden); } catch (e) {}
+    new MutationObserver(anwenden).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

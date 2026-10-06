@@ -1,0 +1,151 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-cobalt: var(--cobalt);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+}
+
+/* shadcn-Grundlook, Primärfarbe = LUMIO-Ink, Akzent = LUMIO-Kobalt */
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.03 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 264);
+  --primary: oklch(0.2 0.035 264);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.003 264);
+  --secondary-foreground: oklch(0.21 0.034 264);
+  --muted: oklch(0.967 0.003 264);
+  --muted-foreground: oklch(0.52 0.02 264);
+  --accent: oklch(0.967 0.003 264);
+  --accent-foreground: oklch(0.21 0.034 264);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.925 0.006 264);
+  --input: oklch(0.925 0.006 264);
+  --ring: oklch(0.55 0.19 266);
+  --cobalt: oklch(0.47 0.2 266);
+  --ok: oklch(0.55 0.13 160);
+  --warn: oklch(0.68 0.15 70);
+  --chart-1: oklch(0.47 0.2 266);
+  --chart-2: oklch(0.6 0.11 180);
+  --chart-3: oklch(0.7 0.14 266);
+  --chart-4: oklch(0.6 0.16 315);
+  --chart-5: oklch(0.55 0.02 264);
+  --sidebar: oklch(0.985 0.002 264);
+  --sidebar-foreground: oklch(0.18 0.03 264);
+  --sidebar-primary: oklch(0.2 0.035 264);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.955 0.006 264);
+  --sidebar-accent-foreground: oklch(0.21 0.034 264);
+  --sidebar-border: oklch(0.925 0.006 264);
+  --sidebar-ring: oklch(0.55 0.19 266);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.16 0.02 264);
+  --foreground: oklch(0.97 0.004 264);
+  --card: oklch(0.2 0.025 264);
+  --card-foreground: oklch(0.97 0.004 264);
+  --popover: oklch(0.2 0.025 264);
+  --popover-foreground: oklch(0.97 0.004 264);
+  --primary: oklch(0.93 0.01 264);
+  --primary-foreground: oklch(0.2 0.035 264);
+  --secondary: oklch(0.27 0.025 264);
+  --secondary-foreground: oklch(0.97 0.004 264);
+  --muted: oklch(0.27 0.025 264);
+  --muted-foreground: oklch(0.71 0.02 264);
+  --accent: oklch(0.27 0.025 264);
+  --accent-foreground: oklch(0.97 0.004 264);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.68 0.15 266);
+  --cobalt: oklch(0.7 0.15 266);
+  --ok: oklch(0.75 0.13 160);
+  --warn: oklch(0.8 0.13 75);
+  --chart-1: oklch(0.68 0.15 266);
+  --chart-2: oklch(0.74 0.11 180);
+  --chart-3: oklch(0.8 0.1 266);
+  --chart-4: oklch(0.74 0.13 315);
+  --chart-5: oklch(0.6 0.02 264);
+  --sidebar: oklch(0.18 0.025 264);
+  --sidebar-foreground: oklch(0.97 0.004 264);
+  --sidebar-primary: oklch(0.68 0.15 266);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.25 0.025 264);
+  --sidebar-accent-foreground: oklch(0.97 0.004 264);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.68 0.15 266);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground antialiased; -webkit-tap-highlight-color: transparent; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  /* Karten in Rastern dürfen schmaler werden als ihre Tabellen; die Tabelle scrollt dann in sich */
+  [data-slot=card] { min-width: 0; }
+}
+
+/* Außerhalb der Ebenen, damit es die w-fit-Klasse schlägt:
+   Auswahlfelder in Formularen auf volle Breite, in Werkzeugleisten bleiben sie schmal */
+.grid > [data-slot=native-select-wrapper] { width: 100%; }
+
+/* Karte */
+.leaflet-container { font-family: inherit; }
+.lumio-label span { position: absolute; transform: translate(-50%, -50%); font-size: 11px; font-weight: 500; line-height: 1.1; color: #5b6475; white-space: nowrap; text-shadow: 0 0 2px #fff, 0 0 4px #fff, 0 0 6px #fff; pointer-events: none; }
+.dark .lumio-label span { color: #a4adbf; text-shadow: 0 0 2px #0a0f1c, 0 0 4px #0a0f1c, 0 0 6px #0a0f1c; }
+.leaflet-tooltip.lumio-tip { background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); font-size: 12px; line-height: 1.35; padding: 6px 9px; }
+.leaflet-tooltip.lumio-tip::before { display: none; }
+.leaflet-bar { border: 1px solid var(--border) !important; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06) !important; border-radius: 8px !important; overflow: hidden; }
+.leaflet-bar a { background: var(--card); color: var(--foreground); border-color: var(--border); }
+.leaflet-bar a:hover { background: var(--muted); }
+.leaflet-control-attribution { font-size: 10px; }
+.dark .leaflet-control-attribution { background: rgb(10 15 28 / 0.75); color: #9aa3b5; }
+.dark .leaflet-control-attribution a { color: #c6cde0; }
