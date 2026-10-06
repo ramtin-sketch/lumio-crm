@@ -70,30 +70,9 @@ export async function laden(session: Session) {
     farbe: p.farbe || FARBEN[i % FARBEN.length], stadt: p.stadt || null, gebiet: p.gebiet || "", email: p.email, aktiv: p.aktiv,
     seit: (p.erstellt_am || "").slice(0, 10), provisionsanteil: p.provisionsanteil, d2d: p.d2d || {},
   }))
-  const mandatListe = mandate.map((m: any) => ({
-    id: String(m.id), dbId: m.id, bereich: m.bereich, name: m.name, produkt: m.produkt || "", status: m.status, seit: m.seit,
-    k: m.kondition || { typ: "offen" }, ktext: m.verguetung_text || "", hv: Number(m.hv_anteil) || 0,
-    ap: m.ansprechpartner || {}, felder: Array.isArray(m.felder_schema) ? m.felder_schema : [],
-  }))
-  const einzeln = (x: any) => (Array.isArray(x) ? x[0] : x) || null
-  const leadListe = leads.map((r: any) => {
-    const ab = einzeln(r.abschluss)
-    const l = {
-      id: r.id, mandat: String(r.mandat_id), bereich: r.bereich, name: r.name, ort: r.ort, adresse: r.adresse, stadt: r.stadt, unit: r.unit,
-      geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
-      stufe: r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
-      next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
-      felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0,
-      uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,
-      kontakte: (r.kontakt || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
-        .map((k: any) => ({ id: k.id, name: k.name, funktion: k.funktion, tel: k.telefon, mail: k.email, notiz: k.notiz })),
-      verlauf: (r.verlauf || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
-        .map((v: any) => ({ id: v.id, datum: v.datum, wer: v.profil_id, art: v.art, titel: v.titel, text: v.text, _s: true })),
-      abschluss: ab ? { datum: ab.datum, status: ab.status, laufzeit: num(ab.laufzeit), monatsbeitrag: num(ab.monatsbeitrag), volumen: num(ab.volumen), teilnehmer: num(ab.teilnehmer), dealgroesse: num(ab.dealgroesse) } : null,
-    }
-    return l
-  }).filter((l: any) => mandatListe.some((m: any) => m.id === l.mandat))
-  const terminListe = termine.map((t: any) => ({ id: t.id, lead: t.lead_id, setter: t.setter_id, closer: t.closer_id, datum: t.datum, zeit: t.zeit, status: t.status, ergebnis: t.ergebnis }))
+  const mandatListe = mandate.map(mandatAus)
+  const leadListe = leads.map(leadAus).filter((l: any) => mandatListe.some((m: any) => m.id === l.mandat))
+  const terminListe = termine.map(terminAus)
   const tage = new Map<string, any>()
   anrufe.forEach((a: any) => {
     const d = a.zeit.slice(0, 10), key = a.profil_id + d
@@ -103,22 +82,15 @@ export async function laden(session: Session) {
     if (a.ergebnis === "termin") t.termine++
     if (a.einwand) t.einwaende[a.einwand] = (t.einwaende[a.einwand] || 0) + 1
   })
-  const sperrListe = sperren.map((e: any) => ({ id: e.id, telefon: e.telefon, email: e.email, firma: e.firma, grund: e.grund, lead: e.lead_id, datum: e.erstellt_am.slice(0, 10), wer: e.erstellt_von }))
+  const sperrListe = sperren.map(sperreAus)
 
   M.datenErsetzen({ personen, mandate: mandatListe, leads: leadListe, termine: terminListe, anrufTage: [...tage.values()], sperrliste: sperrListe })
   K.gebieteSetzen(gebiete)
   K.alleVerorten()
   D.datenErsetzen({
-    objekte: objekte.map((o: any) => ({
-      id: o.id, mandat: String(o.mandat_id), strasse: o.strasse, hausnr: o.hausnr || "", plz: o.plz || "", ort: o.ort || "", stadt: o.stadt, unit: o.unit,
-      geo: o.lat != null && o.lng != null ? { lat: o.lat, lng: o.lng } : null, typ: o.typ, betreuer: o.betreuer_id, gesperrt: o.gesperrt, notiz: o.notiz,
-      wohnungen: (o.wohnung || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am) || a.name.localeCompare(b.name, "de", { numeric: true }))
-        .map((w: any) => ({ id: w.id, name: w.name, status: w.status, versuche: w.versuche, wiederAm: w.wieder_am, notiz: w.notiz, letzterBesuch: w.letzter_besuch })),
-    })),
-    auftraege: auftraege.map((a: any) => ({ id: a.id, objekt: a.objekt_id, wohnung: a.wohnung_id, mandat: String(a.mandat_id), wer: a.vertriebler_id, datum: a.datum, produkt: a.produkt,
-      kunde: { name: a.kunde_name || "", tel: a.kunde_tel || "", mail: a.kunde_mail || "" }, felder: a.felder || {}, status: a.status, statusDatum: a.status_datum,
-      partnerNr: a.partner_nr, provision: a.provision == null ? null : Number(a.provision), ausgezahlt: a.ausgezahlt, notiz: a.notiz })),
-    besuche: besuche.map((b: any) => ({ id: b.id, wohnung: b.wohnung_id, objekt: b.objekt_id, wer: b.profil_id, zeit: b.zeit, ergebnis: b.ergebnis })),
+    objekte: objekte.map(objektAus),
+    auftraege: auftraege.map(auftragAus),
+    besuche: besuche.map(besuchAus),
   })
 
   // Stand merken, damit nur echte Änderungen gespeichert werden
@@ -137,6 +109,42 @@ export async function laden(session: Session) {
   return { ich: session.user.id }
 }
 const num = (x: any) => (x === null || x === undefined ? undefined : Number(x))
+
+/* ---------- Abbildung Datenbank → App ---------- */
+const einzeln = (x: any) => (Array.isArray(x) ? x[0] : x) || null
+const mandatAus = (m: any) => ({
+  id: String(m.id), dbId: m.id, bereich: m.bereich, name: m.name, produkt: m.produkt || "", status: m.status, seit: m.seit,
+  k: m.kondition || { typ: "offen" }, ktext: m.verguetung_text || "", hv: Number(m.hv_anteil) || 0,
+  ap: m.ansprechpartner || {}, felder: Array.isArray(m.felder_schema) ? m.felder_schema : [],
+})
+function leadAus(r: any) {
+  const ab = einzeln(r.abschluss)
+  return {
+    id: r.id, mandat: String(r.mandat_id), bereich: r.bereich, name: r.name, ort: r.ort, adresse: r.adresse, stadt: r.stadt, unit: r.unit,
+    geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
+    stufe: r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
+    next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
+    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0,
+    uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,
+    kontakte: (r.kontakt || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
+      .map((k: any) => ({ id: k.id, name: k.name, funktion: k.funktion, tel: k.telefon, mail: k.email, notiz: k.notiz })),
+    verlauf: (r.verlauf || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
+      .map((v: any) => ({ id: v.id, datum: v.datum, wer: v.profil_id, art: v.art, titel: v.titel, text: v.text, _s: true })),
+    abschluss: ab ? { datum: ab.datum, status: ab.status, laufzeit: num(ab.laufzeit), monatsbeitrag: num(ab.monatsbeitrag), volumen: num(ab.volumen), teilnehmer: num(ab.teilnehmer), dealgroesse: num(ab.dealgroesse) } : null,
+  }
+}
+const terminAus = (t: any) => ({ id: t.id, lead: t.lead_id, setter: t.setter_id, closer: t.closer_id, datum: t.datum, zeit: t.zeit, status: t.status, ergebnis: t.ergebnis })
+const sperreAus = (e: any) => ({ id: e.id, telefon: e.telefon, email: e.email, firma: e.firma, grund: e.grund, lead: e.lead_id, datum: (e.erstellt_am || "").slice(0, 10), wer: e.erstellt_von })
+const objektAus = (o: any) => ({
+  id: o.id, mandat: String(o.mandat_id), strasse: o.strasse, hausnr: o.hausnr || "", plz: o.plz || "", ort: o.ort || "", stadt: o.stadt, unit: o.unit,
+  geo: o.lat != null && o.lng != null ? { lat: o.lat, lng: o.lng } : null, typ: o.typ, betreuer: o.betreuer_id, gesperrt: o.gesperrt, notiz: o.notiz,
+  wohnungen: (o.wohnung || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am) || a.name.localeCompare(b.name, "de", { numeric: true }))
+    .map((w: any) => ({ id: w.id, name: w.name, status: w.status, versuche: w.versuche, wiederAm: w.wieder_am, notiz: w.notiz, letzterBesuch: w.letzter_besuch })),
+})
+const auftragAus = (a: any) => ({ id: a.id, objekt: a.objekt_id, wohnung: a.wohnung_id, mandat: String(a.mandat_id), wer: a.vertriebler_id, datum: a.datum, produkt: a.produkt,
+  kunde: { name: a.kunde_name || "", tel: a.kunde_tel || "", mail: a.kunde_mail || "" }, felder: a.felder || {}, status: a.status, statusDatum: a.status_datum,
+  partnerNr: a.partner_nr, provision: a.provision == null ? null : Number(a.provision), ausgezahlt: a.ausgezahlt, notiz: a.notiz })
+const besuchAus = (b: any) => ({ id: b.id, wohnung: b.wohnung_id, objekt: b.objekt_id, wer: b.profil_id, zeit: b.zeit, ergebnis: b.ergebnis })
 
 /* ---------- Abbildung App → Datenbank ---------- */
 const leadZeile = (l: any) => ({
@@ -472,4 +480,144 @@ export async function sicherungHerunterladen(id: number) {
 export async function exportMelden(art: string, anzahl: number) {
   if (!ECHT) return
   try { await sb.rpc("export_melden", { p_art: art, p_anzahl: anzahl }) } catch (e) {}
+}
+
+/* ---------- Live: Änderungen der anderen sofort übernehmen ----------
+   Supabase schickt jede Änderung an alle offenen Geräte, aber nur an die, die den Datensatz sehen dürfen.
+   Eigene Änderungen werden übersprungen (sind schon da). Leads und Häuser werden komplett frisch geholt,
+   damit Ansprechpartner, Verlauf und Wohnungen stimmen. */
+const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat"]
+let kanal: any = null, liveIch = "", liveZeichnen: () => void = () => {}, liveTimer: any = null, warGetrennt = false, nachladenTimer: any = null
+let liveZustand: "aus" | "verbinde" | "live" | "getrennt" = "aus"
+export const liveStand = () => liveZustand
+const setLive = (z: typeof liveZustand) => { liveZustand = z; hoerer.forEach((f) => f()) }
+const leadWarteschlange = new Map<string, Set<string>>()
+const objektWarteschlange = new Map<string, Set<string>>()
+const einzelne: { t: string; r: any; wer: string | null; art: string }[] = []
+
+export function liveStarten(ich: string, zeichnen: () => void) {
+  liveStoppen()
+  liveIch = ich; liveZeichnen = zeichnen
+  sb.auth.getSession().then(({ data }: any) => {
+    if (!data.session) return
+    sb.realtime.setAuth(data.session.access_token)
+    kanal = sb.channel("lumio-live")
+    for (const t of LIVE_TABELLEN) kanal.on("postgres_changes", { event: "*", schema: "public", table: t }, (p: any) => eingang(t, p))
+    setLive("verbinde")
+    kanal.subscribe((st: string) => {
+      if (st === "SUBSCRIBED") {
+        const nachholen = warGetrennt; warGetrennt = false
+        setLive("live")
+        if (nachholen) allesNachladen()   // was während der Funkstille passiert ist
+      } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+        if (kanal) { warGetrennt = true; setLive("getrennt") }
+      }
+    })
+    // Sicherheitsnetz: alle 15 Minuten alles frisch laden, wenn nichts Ungespeichertes offen ist
+    clearInterval(nachladenTimer)
+    nachladenTimer = setInterval(allesNachladen, 15 * 60000)
+  })
+}
+export function liveStoppen() {
+  clearInterval(nachladenTimer); clearTimeout(liveTimer); liveTimer = null
+  const k = kanal; kanal = null
+  if (k) sb.removeChannel(k)
+  leadWarteschlange.clear(); objektWarteschlange.clear(); einzelne.length = 0
+  if (liveZustand !== "aus") setLive("aus")
+}
+async function allesNachladen() {
+  if (laeuft || offeneAenderungen() || status.zustand !== "bereit") return
+  const { data } = await sb.auth.getSession()
+  if (!data.session) return
+  try { await laden(data.session); liveZeichnen() } catch (e) {}
+}
+
+function eingang(t: string, p: any) {
+  const neu = p.new && Object.keys(p.new).length ? p.new : null
+  const r = neu || p.old || {}
+  const wer: string | null = r.geaendert_von || r.profil_id || r.erstellt_von || null
+  const merkeIn = (m: Map<string, Set<string>>, id: string) => { if (!m.has(id)) m.set(id, new Set()); m.get(id)!.add(wer || "?") }
+  if (t === "lead" || t === "kontakt" || t === "verlauf" || t === "abschluss") { const id = t === "lead" ? r.id : r.lead_id; if (id) merkeIn(leadWarteschlange, id) }
+  else if (t === "objekt" || t === "wohnung") { const id = t === "objekt" ? r.id : r.objekt_id; if (id) merkeIn(objektWarteschlange, id) }
+  else if (neu) einzelne.push({ t, r: neu, wer, art: p.eventType })
+  if (!liveTimer) liveTimer = setTimeout(verarbeiten, 300)
+}
+const fremdeVon = (s: Set<string>) => [...s].filter((w) => w !== liveIch)
+const hinweis = (art: string, id: string, wer: string) => { try { window.dispatchEvent(new CustomEvent("lumio-live", { detail: { art, id, wer } })) } catch (e) {} }
+
+async function verarbeiten() {
+  liveTimer = null
+  if (laeuft) { liveTimer = setTimeout(verarbeiten, 500); return }   // erst die eigenen Änderungen fertig speichern
+  let geaendert = false
+  const spaeter = (m: Map<string, Set<string>>, id: string, s: Set<string>) => { m.set(id, s); if (!liveTimer) liveTimer = setTimeout(verarbeiten, 800) }
+
+  // Leads (mit Ansprechpartnern, Verlauf, Abschluss)
+  const leads = [...leadWarteschlange].filter(([, s]) => fremdeVon(s).length); leadWarteschlange.clear()
+  if (leads.length) {
+    const { data, error } = await sb.from("lead").select("*, kontakt(*), verlauf(*), abschluss(*)").in("id", leads.map(([id]) => id))
+    if (!error) for (const [id, s] of leads) {
+      const vorhanden = M.LEADS.find((l: any) => l.id === id)
+      if (vorhanden && (anders("lead:" + id, leadZeile(vorhanden)) || vorhanden.kontakte.some((k: any) => anders("kontakt:" + k.id, kontaktZeile(vorhanden, k))))) { spaeter(leadWarteschlange, id, s); continue }
+      const r = (data || []).find((x: any) => x.id === id)
+      const i = M.LEADS.findIndex((l: any) => l.id === id)
+      if (!r || !M.MANDATE.some((m: any) => m.id === String(r.mandat_id))) { if (i >= 0) { M.LEADS.splice(i, 1); geaendert = true } continue }
+      const l: any = leadAus(r)
+      if (l.bereich === "standort") K.verorten(l)
+      if (i >= 0) Object.assign(M.LEADS[i], l); else (M.LEADS as any[]).push(l)
+      merke("lead:" + id, leadZeile(l)); l.kontakte.forEach((k: any) => merke("kontakt:" + k.id, kontaktZeile(l, k)))
+      if (l.abschluss) merke("abschluss:" + id, abschlussZeile(l))
+      geaendert = true
+      hinweis("lead", id, fremdeVon(s)[0])
+    }
+  }
+
+  // Häuser mit Wohnungen
+  const objekte = [...objektWarteschlange].filter(([, s]) => fremdeVon(s).length); objektWarteschlange.clear()
+  if (objekte.length) {
+    const { data, error } = await sb.from("objekt").select("*, wohnung(*)").in("id", objekte.map(([id]) => id))
+    if (!error) for (const [id, s] of objekte) {
+      const vorhanden = D.OBJEKTE.find((o: any) => o.id === id)
+      if (vorhanden && (anders("objekt:" + id, objektZeile(vorhanden)) || vorhanden.wohnungen.some((w: any) => anders("wohnung:" + w.id, wohnungZeile(vorhanden, w))))) { spaeter(objektWarteschlange, id, s); continue }
+      const r = (data || []).find((x: any) => x.id === id)
+      const i = D.OBJEKTE.findIndex((o: any) => o.id === id)
+      if (!r) { if (i >= 0) { D.OBJEKTE.splice(i, 1); geaendert = true } continue }
+      const o: any = objektAus(r); D.verorten(o)
+      if (i >= 0) Object.assign(D.OBJEKTE[i], o); else (D.OBJEKTE as any[]).push(o)
+      merke("objekt:" + id, objektZeile(o)); o.wohnungen.forEach((w: any) => merke("wohnung:" + w.id, wohnungZeile(o, w)))
+      geaendert = true
+      hinweis("objekt", id, fremdeVon(s)[0])
+    }
+  }
+
+  // Alles andere direkt aus der Nachricht
+  for (const { t, r, wer, art } of einzelne.splice(0)) {
+    if (wer && wer === liveIch) continue
+    if (t === "termin") {
+      const x = terminAus(r), i = M.TERMINE.findIndex((y: any) => y.id === x.id)
+      if (i >= 0) Object.assign(M.TERMINE[i], x); else (M.TERMINE as any[]).push(x)
+      merke("termin:" + x.id, terminZeile(x))
+    } else if (t === "mandat") {
+      const x = mandatAus(r), i = M.MANDATE.findIndex((y: any) => y.id === x.id)
+      if (i >= 0) Object.assign(M.MANDATE[i], x); else (M.MANDATE as any[]).push(x)
+    } else if (t === "gebiet") {
+      if (r.profil_id) K.GEBIET[r.unit] = r.profil_id; else delete K.GEBIET[r.unit]
+      merke("gebiet:" + r.unit, r.profil_id || undefined)
+    } else if (t === "sperrliste") {
+      if (!M.SPERRLISTE.some((e: any) => e.id === r.id)) (M.SPERRLISTE as any[]).push(sperreAus(r))
+    } else if (t === "anruf" && art === "INSERT") {
+      const tg = M.anrufTag(r.profil_id, String(r.zeit).slice(0, 10)); tg.wahl++
+      if (r.ergebnis !== "nicht") tg.erreicht++
+      if (r.ergebnis === "termin") tg.termine++
+      if (r.einwand) tg.einwaende[r.einwand] = (tg.einwaende[r.einwand] || 0) + 1
+    } else if (t === "besuch") {
+      if (!D.BESUCHE.some((b: any) => b.id === r.id)) (D.BESUCHE as any[]).push(besuchAus(r))
+    } else if (t === "auftrag") {
+      const x = auftragAus(r), i = D.AUFTRAEGE.findIndex((y: any) => y.id === x.id)
+      if (i >= 0) Object.assign(D.AUFTRAEGE[i], x); else (D.AUFTRAEGE as any[]).push(x)
+      merke("auftrag:" + x.id, auftragZeile(x))
+      hinweis("auftrag", x.id, wer || "")
+    } else continue
+    geaendert = true
+  }
+  if (geaendert) liveZeichnen()
 }

@@ -1,3 +1,4 @@
+import { useLiveHinweis } from "@/live-hinweis"
 import * as React from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ export function TuerBadge({ s, w }: { s: string; w?: any }) {
 export function ObjektSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   useDaten()
   const o = id ? D.objekt(id) : null
+  useLiveHinweis("objekt", o?.id, "hat in diesem Haus gerade etwas eingetragen. Du siehst schon den neuen Stand.")
   return (
     <Sheet open={!!o} onOpenChange={(x) => !x && onClose()}>
       <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">{o && <Inhalt key={o.id} o={o} />}</SheetContent>

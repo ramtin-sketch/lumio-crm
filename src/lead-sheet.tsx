@@ -1,3 +1,4 @@
+import { useLiveHinweis } from "@/live-hinweis"
 import * as React from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,7 @@ export function LeadSheet() {
   useDaten()
   const ui = useUI()
   const l = ui.detail !== null ? M.LEADS.find((x: any) => x.id === ui.detail) : null
+  useLiveHinweis("lead", l?.id, "hat diesen Lead gerade geändert. Du siehst schon den neuen Stand.")
   return (
     <Sheet open={!!l} onOpenChange={(o) => !o && ui.oeffne(null)}>
       <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">

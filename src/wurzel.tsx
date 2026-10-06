@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ECHT, sb, laden, anmelden, abmelden, offeneAenderungen, syncStatus, zweifaktorStand, zweifaktorPflicht, aktivitaetMerken, zuLangeWeg, ABMELDEN_NACH_STUNDEN } from "@/daten/echt"
+import { ECHT, sb, laden, anmelden, abmelden, offeneAenderungen, syncStatus, zweifaktorStand, zweifaktorPflicht, aktivitaetMerken, zuLangeWeg, ABMELDEN_NACH_STUNDEN, liveStarten, liveStoppen } from "@/daten/echt"
 import { ZweifaktorCode, ZweifaktorEinrichten } from "@/zweifaktor"
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner"
@@ -98,7 +98,7 @@ function Echt() {
 
   // Zwei-Faktor: Code abfragen, einrichten lassen oder durchlassen
   React.useEffect(() => {
-    if (!session) { setTor("pruefe"); setIch(null); return }
+    if (!session) { setTor("pruefe"); setIch(null); liveStoppen(); return }
     if (tor !== "pruefe") return
     let ab = false
     ;(async () => {
@@ -122,6 +122,7 @@ function Echt() {
       if (!M.person(session.user.id)) { setFehler("Dein Zugang ist noch nicht freigeschaltet. Bitte bei der Geschäftsführung melden."); return }
       if (M.person(session.user.id).aktiv === false) { setFehler("Dieser Zugang ist gesperrt."); return }
       setIch(session.user.id)
+      liveStarten(session.user.id, neuZeichnen)
     }).catch((e) => setFehler("Die Daten konnten nicht geladen werden: " + e.message))
   }, [session?.user?.id, tor])
 

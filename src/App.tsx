@@ -24,7 +24,7 @@ import { LeadSheet } from "@/lead-sheet"
 import { NeuSheet } from "@/neu-sheet"
 import { Suche } from "@/suche"
 import { Cloud, CloudOff, Loader2, LocateFixed, Plus, Search } from "lucide-react"
-import { aufStatus, syncStatus } from "@/daten/echt"
+import { aufStatus, syncStatus, liveStand } from "@/daten/echt"
 import { Datenschutz } from "@/views/datenschutz"
 import { ImportExport } from "@/views/import"
 
@@ -38,9 +38,13 @@ function SyncAnzeige() {
   const [, set] = React.useState(0)
   React.useEffect(() => aufStatus(() => set((n) => n + 1)), [])
   const s = syncStatus()
+  const live = liveStand()
   if (s.zustand === "fehler") return <Badge variant="outline" className="max-w-[50vw] truncate border-transparent bg-destructive/10 text-destructive" title={s.fehler}><CloudOff />{s.fehler}</Badge>
   if (s.zustand === "speichert") return <Badge variant="outline" className="text-muted-foreground"><Loader2 className="animate-spin" /><span className="hidden sm:inline">Speichert …</span></Badge>
-  return <Badge variant="outline" className="hidden text-muted-foreground sm:inline-flex"><Cloud />Gespeichert</Badge>
+  if (live === "getrennt") return <Badge variant="outline" className="text-muted-foreground" title="Die Live-Verbindung ist kurz weg. Sobald sie wieder steht, wird nachgeladen."><span className="size-2 rounded-full bg-warn" aria-hidden="true" /><span className="hidden sm:inline">Nicht live</span></Badge>
+  return <Badge variant="outline" className="hidden text-muted-foreground sm:inline-flex" title={live === "live" ? "Gespeichert. Änderungen der anderen erscheinen sofort." : "Gespeichert"}>
+    {live === "live" ? <span className="relative flex size-2" aria-hidden="true"><span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-50 motion-reduce:hidden" /><span className="relative inline-flex size-2 rounded-full bg-ok" /></span> : <Cloud />}
+    {live === "live" ? "Live · gespeichert" : "Gespeichert"}</Badge>
 }
 
 function Kopf() {
