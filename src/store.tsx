@@ -11,7 +11,7 @@ export function useDaten() {
   return React.useSyncExternalStore((cb) => { abos.add(cb); return () => abos.delete(cb) }, () => version)
 }
 
-export type Ansicht = "heute" | "dashboard" | "werbung" | "standort" | "anrufen" | "mandate" | "team" | "verdienst" | "uebergaben" | "termine" | "bildung" | "karte" | "datenschutz" | "import"
+export type Ansicht = "heute" | "dashboard" | "werbung" | "standort" | "anrufen" | "mandate" | "team" | "verdienst" | "uebergaben" | "termine" | "bildung" | "karte" | "datenschutz" | "import" | "d2d"
 
 type UI = {
   ich: string; setIch: (id: string) => void

@@ -4,6 +4,7 @@
 import { createClient, type Session } from "@supabase/supabase-js"
 import * as M from "@/model/model.js"
 import * as K from "@/model/karte.js"
+import * as D from "@/model/d2d.js"
 
 export const SUPABASE_URL = "https://ehgjsvpbzgmlcgingkel.supabase.co"
 export const SUPABASE_KEY = "sb_publishable_GVNRUlS24_FvyG_PpsfRSw_GqpQQiaj" // öffentlicher Schlüssel, Rechte regelt die Datenbank
@@ -45,14 +46,17 @@ const anders = (schluessel: string, zeile: any) => gespeichert.get(schluessel) !
 
 export async function laden(session: Session) {
   const seit = M.ymAdd(M.MONAT, -6) + "-01"
-  const [profile, mandate, leads, termine, anrufe, gebiete, sperren] = await Promise.all([
+  const [profile, mandate, leads, termine, anrufe, gebiete, sperren, objekte, auftraege, besuche] = await Promise.all([
     alle("profil"),
-    alle("mandat", "*", (q) => q.neq("bereich", "d2d").order("id")),
+    alle("mandat", "*", (q) => q.order("id")),
     alle("lead", "*, kontakt(*), verlauf(*), abschluss(*)"),
     alle("termin"),
     alle("anruf", "*", (q) => q.gte("zeit", seit)),
     alle("gebiet"),
     alle("sperrliste"),
+    alle("objekt", "*, wohnung(*)"),
+    alle("auftrag"),
+    alle("besuch", "*", (q) => q.gte("zeit", seit)),
   ])
   gespeichert.clear()
 
@@ -60,7 +64,7 @@ export async function laden(session: Session) {
     id: p.id, name: (p.name || p.email || "?").split(" ")[0], voll: p.name || p.email, rolle: ROLLE_APP[p.rolle] || "setter", dbRolle: p.rolle,
     kurz: p.kurz || (p.name || "?").split(/\s+/).map((t: string) => t[0]).join("").slice(0, 2).toUpperCase(),
     farbe: p.farbe || FARBEN[i % FARBEN.length], stadt: p.stadt || null, gebiet: p.gebiet || "", email: p.email, aktiv: p.aktiv,
-    seit: (p.erstellt_am || "").slice(0, 10), provisionsanteil: p.provisionsanteil,
+    seit: (p.erstellt_am || "").slice(0, 10), provisionsanteil: p.provisionsanteil, d2d: p.d2d || {},
   }))
   const mandatListe = mandate.map((m: any) => ({
     id: String(m.id), dbId: m.id, bereich: m.bereich, name: m.name, produkt: m.produkt || "", status: m.status, seit: m.seit,
@@ -100,6 +104,18 @@ export async function laden(session: Session) {
   M.datenErsetzen({ personen, mandate: mandatListe, leads: leadListe, termine: terminListe, anrufTage: [...tage.values()], sperrliste: sperrListe })
   K.gebieteSetzen(gebiete)
   K.alleVerorten()
+  D.datenErsetzen({
+    objekte: objekte.map((o: any) => ({
+      id: o.id, mandat: String(o.mandat_id), strasse: o.strasse, hausnr: o.hausnr || "", plz: o.plz || "", ort: o.ort || "", stadt: o.stadt, unit: o.unit,
+      geo: o.lat != null && o.lng != null ? { lat: o.lat, lng: o.lng } : null, typ: o.typ, betreuer: o.betreuer_id, gesperrt: o.gesperrt, notiz: o.notiz,
+      wohnungen: (o.wohnung || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am) || a.name.localeCompare(b.name, "de", { numeric: true }))
+        .map((w: any) => ({ id: w.id, name: w.name, status: w.status, versuche: w.versuche, wiederAm: w.wieder_am, notiz: w.notiz, letzterBesuch: w.letzter_besuch })),
+    })),
+    auftraege: auftraege.map((a: any) => ({ id: a.id, objekt: a.objekt_id, wohnung: a.wohnung_id, mandat: String(a.mandat_id), wer: a.vertriebler_id, datum: a.datum, produkt: a.produkt,
+      kunde: { name: a.kunde_name || "", tel: a.kunde_tel || "", mail: a.kunde_mail || "" }, felder: a.felder || {}, status: a.status, statusDatum: a.status_datum,
+      partnerNr: a.partner_nr, provision: a.provision == null ? null : Number(a.provision), ausgezahlt: a.ausgezahlt, notiz: a.notiz })),
+    besuche: besuche.map((b: any) => ({ id: b.id, wohnung: b.wohnung_id, objekt: b.objekt_id, wer: b.profil_id, zeit: b.zeit, ergebnis: b.ergebnis })),
+  })
 
   // Stand merken, damit nur echte Änderungen gespeichert werden
   M.LEADS.forEach((l: any) => {
@@ -108,6 +124,9 @@ export async function laden(session: Session) {
     if (l.abschluss) merke("abschluss:" + l.id, abschlussZeile(l))
   })
   M.TERMINE.forEach((t: any) => merke("termin:" + t.id, terminZeile(t)))
+  D.OBJEKTE.forEach((o: any) => { merke("objekt:" + o.id, objektZeile(o)); o.wohnungen.forEach((w: any) => merke("wohnung:" + w.id, wohnungZeile(o, w))) })
+  D.AUFTRAEGE.forEach((a: any) => merke("auftrag:" + a.id, auftragZeile(a)))
+  M.PERSONEN.forEach((p: any) => merke("d2d:" + p.id, p.d2d || {}))
   Object.keys(K.GEBIET).forEach((u) => merke("gebiet:" + u, K.GEBIET[u]))
   gebiete.forEach((g: any) => merke("gebiet:" + g.unit, g.profil_id))
   setStatus({ zustand: "bereit", fehler: undefined, zuletzt: new Date() })
@@ -131,6 +150,13 @@ const abschlussZeile = (l: any) => {
   return { lead_id: l.id, datum: a.datum, status: a.status, laufzeit: a.laufzeit ?? null, monatsbeitrag: a.monatsbeitrag ?? null, volumen: a.volumen ?? null, teilnehmer: a.teilnehmer ?? null, dealgroesse: a.dealgroesse ?? null }
 }
 const terminZeile = (t: any) => ({ id: t.id, lead_id: t.lead || null, setter_id: t.setter || null, closer_id: t.closer || null, datum: t.datum, zeit: t.zeit || null, status: t.status, ergebnis: t.ergebnis || "offen" })
+
+const objektZeile = (o: any) => ({ id: o.id, mandat_id: Number(o.mandat) || null, strasse: o.strasse, hausnr: o.hausnr || null, plz: o.plz || null, ort: o.ort || null,
+  stadt: o.stadt || null, unit: o.unit || null, lat: o.geo?.lat ?? null, lng: o.geo?.lng ?? null, typ: o.typ || "mfh", betreuer_id: o.betreuer || null, gesperrt: !!o.gesperrt, notiz: o.notiz || null })
+const wohnungZeile = (o: any, w: any) => ({ id: w.id, objekt_id: o.id, name: w.name, status: w.status, versuche: w.versuche || 0, wieder_am: w.wiederAm || null, notiz: w.notiz || null, letzter_besuch: w.letzterBesuch || null })
+const auftragZeile = (a: any) => ({ id: a.id, objekt_id: a.objekt || null, wohnung_id: a.wohnung || null, mandat_id: Number(a.mandat), vertriebler_id: a.wer, datum: a.datum, produkt: a.produkt || null,
+  kunde_name: a.kunde?.name || null, kunde_tel: a.kunde?.tel || null, kunde_mail: a.kunde?.mail || null, felder: a.felder || {}, status: a.status, status_datum: a.statusDatum || a.datum,
+  partner_nr: a.partnerNr || null, provision: a.provision ?? null, ausgezahlt: !!a.ausgezahlt, notiz: a.notiz || null })
 
 /* ---------- Fotos ---------- */
 async function fotosHochladen(l: any) {
@@ -166,7 +192,7 @@ export function spaeterSpeichern() {
   zeitgeber = setTimeout(flush, 400)
 }
 export function offeneAenderungen() {
-  return M.LEADS.some((l: any) => anders("lead:" + l.id, leadZeile(l))) || M.ANRUF_LOG.length > 0 || M.SPERRLISTE.some((e: any) => e.neu)
+  return M.LEADS.some((l: any) => anders("lead:" + l.id, leadZeile(l))) || M.ANRUF_LOG.length > 0 || M.SPERRLISTE.some((e: any) => e.neu) || D.BESUCHE.some((b: any) => b.neu)
 }
 
 async function flush() {
@@ -242,7 +268,39 @@ async function flush() {
       if (error) throw new Error(error.message)
       gebiete.forEach((g) => merke("gebiet:" + g.unit, g.profil_id))
     }
-    // 9. Sperrliste
+    // 9. Door-to-Door: Häuser, Wohnungen, Türbesuche, Aufträge, Freigaben
+    const objekte = D.OBJEKTE.filter((o: any) => anders("objekt:" + o.id, objektZeile(o))).map(objektZeile)
+    if (objekte.length) {
+      const { error } = await sb.from("objekt").upsert(objekte)
+      if (error) throw new Error(error.message)
+      objekte.forEach((z: any) => merke("objekt:" + z.id, z))
+    }
+    const wohnungen: any[] = []
+    D.OBJEKTE.forEach((o: any) => o.wohnungen.forEach((w: any) => { const z = wohnungZeile(o, w); if (anders("wohnung:" + w.id, z)) wohnungen.push(z) }))
+    if (wohnungen.length) {
+      const { error } = await sb.from("wohnung").upsert(wohnungen)
+      if (error) throw new Error(error.message)
+      wohnungen.forEach((z) => merke("wohnung:" + z.id, z))
+    }
+    const besuche = D.BESUCHE.filter((b: any) => b.neu)
+    if (besuche.length) {
+      const { error } = await sb.from("besuch").insert(besuche.map((b: any) => ({ id: b.id, wohnung_id: b.wohnung, objekt_id: b.objekt, profil_id: b.wer, zeit: b.zeit, ergebnis: b.ergebnis })))
+      if (error) throw new Error(error.message)
+      besuche.forEach((b: any) => (b.neu = false))
+    }
+    const auftraege = D.AUFTRAEGE.filter((a: any) => anders("auftrag:" + a.id, auftragZeile(a))).map(auftragZeile)
+    if (auftraege.length) {
+      const { error } = await sb.from("auftrag").upsert(auftraege)
+      if (error) throw new Error(error.message)
+      auftraege.forEach((z: any) => merke("auftrag:" + z.id, z))
+    }
+    for (const p of M.PERSONEN as any[]) {
+      if (!anders("d2d:" + p.id, p.d2d || {})) continue
+      const { error } = await sb.from("profil").update({ d2d: p.d2d || {} }).eq("id", p.id)
+      if (error) throw new Error(error.message)
+      merke("d2d:" + p.id, p.d2d || {})
+    }
+    // 10. Sperrliste
     for (const e of M.SPERRLISTE.filter((e: any) => e.neu) as any[]) {
       const { error } = await sb.rpc("sperre_eintragen", { p_telefon: e.telefon, p_email: e.email, p_firma: e.firma, p_grund: e.grund, p_lead: typeof e.lead === "string" ? e.lead : null })
       if (error) throw new Error(error.message)

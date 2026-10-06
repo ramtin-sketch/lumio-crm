@@ -111,11 +111,12 @@ const STUFEN = {
   ]
 };
 /* Werbung und Weiterbildung laufen am Telefon über Setter und Closer, Standorte draußen */
-function istTel(l){ return l.bereich !== 'standort'; }
+function istTel(l){ return l.bereich === 'werbung' || l.bereich === 'bildung'; }
 const BEREICHE = [
   { id: 'werbung',  name: 'Werbemandate',   kurz: 'Werbung' },
   { id: 'bildung',  name: 'Weiterbildung',  kurz: 'Weiterbildung' },
-  { id: 'standort', name: 'Standortakquise', kurz: 'Standorte' }
+  { id: 'standort', name: 'Standortakquise', kurz: 'Standorte' },
+  { id: 'd2d',      name: 'Door-to-Door',    kurz: 'Door-to-Door' }
 ];
 const EINWAENDE = ['Kein Budget', 'Kein Bedarf', 'Schon versorgt', 'Keine Zeit', 'Erst intern abstimmen', 'Zu teuer', 'Schlechte Erfahrung'];
 const ERGEBNISSE = [

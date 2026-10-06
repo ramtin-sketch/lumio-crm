@@ -8,6 +8,7 @@ import * as M from "@/model/model.js"
 import * as React from "react"
 import { ArrowRight, Mail, Pencil, Phone, Plus } from "lucide-react"
 import { MandatSheet } from "@/mandat-sheet"
+import * as D from "@/model/d2d.js"
 
 export function Mandate() {
   useDaten()
@@ -26,7 +27,10 @@ export function Mandate() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {M.MANDATE.filter((m: any) => m.bereich === b).map((m: any) => {
               const ls = M.LEADS.filter((l: any) => l.mandat === m.id)
-              const um = ls.reduce((s: number, l: any) => s + sechs.reduce((t2, mo) => t2 + M.umsatzImMonat(l, mo), 0), 0)
+              const as = m.bereich === "d2d" ? D.AUFTRAEGE.filter((a: any) => a.mandat === m.id) : []
+              const um = m.bereich === "d2d"
+                ? as.filter((a: any) => a.status === "geschaltet" && sechs.includes(M.ym(a.statusDatum))).reduce((s: number, a: any) => s + D.provisionVon(a).lumio, 0)
+                : ls.reduce((s: number, l: any) => s + sechs.reduce((t2, mo) => t2 + M.umsatzImMonat(l, mo), 0), 0)
               return (
                 <Card key={m.id}>
                   <CardHeader>
@@ -39,7 +43,7 @@ export function Mandate() {
                   </CardHeader>
                   <CardContent className="space-y-4 text-sm">
                     <div className="grid grid-cols-3 gap-2">
-                      {[["offen", ls.filter(M.istOffen).length], ["Abschlüsse", ls.filter((l: any) => l.abschluss).length], ["6 Monate", M.eur(um)]].map(([l, v]) => (
+                      {(m.bereich === "d2d" ? [["in Arbeit", as.filter((a: any) => !D.statusVon(a.status).ende && a.status !== "geschaltet").length], ["geschaltet", as.filter((a: any) => a.status === "geschaltet").length], ["6 Monate", M.eur(um)]] : [["offen", ls.filter(M.istOffen).length], ["Abschlüsse", ls.filter((l: any) => l.abschluss).length], ["6 Monate", M.eur(um)]]).map(([l, v]) => (
                         <div key={l as string} className="rounded-lg bg-muted/60 px-3 py-2"><div className="font-mono text-base tabular">{v}</div><div className="text-xs text-muted-foreground">{l}</div></div>
                       ))}
                     </div>
@@ -56,7 +60,7 @@ export function Mandate() {
                     <div className="flex flex-wrap gap-1">{m.felder.map((f: any) => <Badge key={f.key} variant="secondary" className="font-normal">{f.label}</Badge>)}</div>
                   </CardContent>
                   {m.status === "aktiv" && (
-                    <CardFooter className="mt-auto"><Button variant="ghost" size="sm" className="-ml-2" onClick={() => ui.geheZu(m.bereich, { mandat: m.id })}>Leads ansehen<ArrowRight /></Button></CardFooter>
+                    <CardFooter className="mt-auto"><Button variant="ghost" size="sm" className="-ml-2" onClick={() => ui.geheZu(m.bereich === "d2d" ? "d2d" : m.bereich, { mandat: m.id })}>Leads ansehen<ArrowRight /></Button></CardFooter>
                   )}
                 </Card>
               )

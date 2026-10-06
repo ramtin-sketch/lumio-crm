@@ -2,7 +2,7 @@ import * as React from "react"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
 import { useUI, type Ansicht } from "@/store"
 import * as M from "@/model/model.js"
-import { ArrowRightLeft, Building2, GraduationCap, Map as MapIcon, CalendarCheck, LayoutDashboard, MapPin, Megaphone, Phone, Users, Wallet } from "lucide-react"
+import { ArrowRightLeft, Building2, DoorOpen, GraduationCap, Map as MapIcon, CalendarCheck, LayoutDashboard, MapPin, Megaphone, Phone, Users, Wallet } from "lucide-react"
 
 export function Suche() {
   const ui = useUI()
@@ -13,7 +13,7 @@ export function Suche() {
   const leads = M.LEADS.filter((l: any) => ui.istGF || l.betreuer === ui.ich)
   const offen = leads.filter(M.istOffen)
   const seiten: [Ansicht, string, any][] = ui.istGF
-    ? [["heute", "Heute", CalendarCheck], ["dashboard", "Dashboard", LayoutDashboard], ["werbung", "Werbemandate", Megaphone], ["bildung", "Weiterbildung", GraduationCap], ["standort", "Standortakquise", MapPin], ["karte", "Karte", MapIcon], ["anrufen", "Anrufen", Phone], ["uebergaben", "Übergaben", ArrowRightLeft], ["mandate", "Mandate", Building2], ["team", "Team & Provisionen", Users]]
+    ? [["heute", "Heute", CalendarCheck], ["dashboard", "Dashboard", LayoutDashboard], ["werbung", "Werbemandate", Megaphone], ["bildung", "Weiterbildung", GraduationCap], ["standort", "Standortakquise", MapPin], ["karte", "Karte", MapIcon], ["d2d", "Door-to-Door", DoorOpen], ["anrufen", "Anrufen", Phone], ["uebergaben", "Übergaben", ArrowRightLeft], ["mandate", "Mandate", Building2], ["team", "Team & Provisionen", Users]]
     : M.person(ui.ich).rolle === "setter"
     ? [["heute", "Heute", CalendarCheck], ["anrufen", "Anrufen", Phone], ["termine", "Meine Termine", ArrowRightLeft]]
     : [["heute", "Heute", CalendarCheck], ["karte", "Mein Gebiet", MapIcon], ["standort", "Meine Standorte", MapPin], ["verdienst", "Mein Verdienst", Wallet]]

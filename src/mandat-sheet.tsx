@@ -39,6 +39,7 @@ function Formular({ m, onClose }: { m: any | null; onClose: () => void }) {
   const [w, setW] = React.useState(() => ({
     name: m?.name || "", bereich: m?.bereich || "werbung", produkt: m?.produkt || "", status: m?.status || "aktiv",
     typ: m?.k?.typ || "offen", betrag: m?.k?.betrag ?? "", satz: m?.k?.satz ?? "", min: m?.k?.min ?? "",
+    produkte: (m?.k?.produkte || []).join("\n"), rueckhalt: m?.k?.rueckhalt ?? 20, stornofrist: m?.k?.stornofrist ?? 6,
     ktext: m?.ktext || "", hv: m?.hv ?? 0, seit: m?.seit || "",
     apName: m?.ap?.name || "", apFunktion: m?.ap?.funktion || "", apTel: m?.ap?.tel || "", apMail: m?.ap?.mail || "",
     felder: (m?.felder || []).map((f: any) => ({ ...f })) as { key: string; label: string; typ: string }[],
@@ -53,6 +54,7 @@ function Formular({ m, onClose }: { m: any | null; onClose: () => void }) {
     if (w.typ === "fix") k.betrag = zahl(w.betrag)
     if (w.typ === "marge" || w.typ === "prozent" || w.typ === "kopf") k.satz = zahl(w.satz)
     if (w.typ === "kopf") k.min = zahl(w.min) || 0
+    if (w.bereich === "d2d") { k.produkte = String(w.produkte).split("\n").map((x: string) => x.trim()).filter(Boolean); k.rueckhalt = Number(w.rueckhalt) || 0; k.stornofrist = Number(w.stornofrist) || 0 }
     const neu = {
       ...(m || {}), name: w.name.trim(), bereich: w.bereich, produkt: w.produkt.trim(), status: w.status, k, ktext: w.ktext.trim(),
       hv: Number(w.hv) || 0, seit: w.seit || null,
@@ -93,7 +95,16 @@ function Formular({ m, onClose }: { m: any | null; onClose: () => void }) {
           </div>
         )}
         <Feld id="mt" label="Konditionen in Worten"><Textarea id="mt" value={w.ktext} onChange={(e) => set("ktext", e.target.value)} className="min-h-16" /></Feld>
-        {w.bereich === "standort" && <Feld id="mh" label="Anteil für Handelsvertreter (%)"><Input id="mh" type="number" min={0} max={100} value={w.hv} onChange={(e) => set("hv", e.target.value)} /></Feld>}
+        {w.bereich === "d2d" && (
+          <>
+            <Feld id="mpr" label="Produkte und Tarife (eins pro Zeile)"><Textarea id="mpr" value={w.produkte} onChange={(e) => set("produkte", e.target.value)} className="min-h-20" placeholder={"Pure Speed 250\nKombi Internet + TV"} /></Feld>
+            <div className="grid grid-cols-2 gap-3">
+              <Feld id="mrh" label="Rückhalt von der Provision (%)"><Input id="mrh" type="number" min={0} max={100} value={w.rueckhalt} onChange={(e) => set("rueckhalt", e.target.value)} /></Feld>
+              <Feld id="msf" label="Stornohaftung (Monate)"><Input id="msf" type="number" min={0} max={36} value={w.stornofrist} onChange={(e) => set("stornofrist", e.target.value)} /></Feld>
+            </div>
+          </>
+        )}
+        {(w.bereich === "standort" || w.bereich === "d2d") && <Feld id="mh" label="Anteil für Handelsvertreter (%)"><Input id="mh" type="number" min={0} max={100} value={w.hv} onChange={(e) => set("hv", e.target.value)} /></Feld>}
         <div className="grid gap-2">
           <span className="text-xs text-muted-foreground">Ansprechpartner beim Mandanten</span>
           <div className="grid grid-cols-2 gap-3">

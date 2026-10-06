@@ -9,12 +9,13 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useUI, useDaten, type Ansicht } from "@/store"
 import * as M from "@/model/model.js"
+import * as D from "@/model/d2d.js"
 import { abmelden } from "@/daten/echt"
 import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Map as MapIcon, ShieldCheck, CalendarCheck, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Map as MapIcon, ShieldCheck, CalendarCheck, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -41,6 +42,7 @@ export function AppSidebar() {
           { id: "bildung", titel: "Weiterbildung", icon: GraduationCap },
           { id: "standort", titel: "Standortakquise", icon: MapPin },
           { id: "karte", titel: "Karte", icon: MapIcon },
+          { id: "d2d", titel: "Door-to-Door", icon: DoorOpen },
           { id: "anrufen", titel: "Anrufen", icon: Phone, zahl: anrufListe },
           { id: "uebergaben", titel: "Übergaben", icon: ArrowRightLeft, zahl: meineUebergaben },
         ] },
@@ -63,6 +65,7 @@ export function AppSidebar() {
           { id: "heute", titel: "Heute", icon: CalendarCheck, zahl: faelligHeute },
           { id: "karte", titel: "Mein Gebiet", icon: MapIcon },
           { id: "standort", titel: "Meine Standorte", icon: MapPin },
+          ...(ich.d2d?.freigaben?.length || D.OBJEKTE.some((o: any) => o.betreuer === ui.ich) ? [{ id: "d2d" as Ansicht, titel: "Door-to-Door", icon: DoorOpen }] : []),
           { id: "verdienst", titel: "Mein Verdienst", icon: Wallet },
         ] },
       ]

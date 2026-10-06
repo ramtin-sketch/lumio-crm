@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Seitenkopf } from "@/bits"
 import { bump, useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
+import * as D from "@/model/d2d.js"
 import { toast } from "sonner"
 import { ECHT } from "@/daten/echt"
 import { Download, FileUp, Upload } from "lucide-react"
@@ -74,8 +75,70 @@ export function ImportExport() {
 }
 
 function Import() {
-  const ui = useUI()
   const [bereich, setBereich] = React.useState("werbung")
+  return bereich === "d2d" ? <HausImport setBereich={setBereich} /> : <LeadImport bereich={bereich} setBereich={setBereich} />
+}
+
+function BereichWahl({ bereich, setBereich }: { bereich: string; setBereich: (b: string) => void }) {
+  return (
+    <div className="grid gap-1.5"><Label htmlFor="ib" className="text-xs text-muted-foreground">Bereich</Label>
+      <NativeSelect id="ib" value={bereich} onChange={(e) => setBereich(e.target.value)}>{M.BEREICHE.map((b: any) => <NativeSelectOption key={b.id} value={b.id}>{b.name}</NativeSelectOption>)}</NativeSelect></div>
+  )
+}
+
+const ZIELE_HAUS = [
+  { key: "strasse", label: "Straße *", muster: /stra(ss|ß)e|street|adresse/i },
+  { key: "hausnr", label: "Hausnummer", muster: /haus.?n|^nr|nummer|hnr/i },
+  { key: "plz", label: "PLZ", muster: /plz|postleit|zip/i },
+  { key: "ort", label: "Ort", muster: /^ort|stadt|city|gemeinde/i },
+  { key: "we", label: "Wohnungen", muster: /wohn|we\b|einheit|units/i },
+  { key: "lat", label: "Breitengrad", muster: /lat|breite/i },
+  { key: "lng", label: "Längengrad", muster: /lon|lng|länge/i },
+]
+
+function HausImport({ setBereich }: { setBereich: (b: string) => void }) {
+  const ui = useUI()
+  const mandate = D.mandateD2D()
+  const [mandat, setMandat] = React.useState(mandate[0]?.id || "")
+  const leute = M.PERSONEN.filter((p: any) => p.rolle === "hv" && p.aktiv !== false)
+  const [betreuer, setBetreuer] = React.useState(leute[0]?.id || "")
+  const [text, setText] = React.useState("")
+  const zeilen = React.useMemo(() => (text.trim() ? csvLesen(text) : []), [text])
+  const kopf = zeilen[0] || []
+  const z: Record<string, number> = {}
+  ZIELE_HAUS.forEach((t) => { const i = kopf.findIndex((h) => t.muster.test(h)); if (i >= 0 && !Object.values(z).includes(i)) z[t.key] = i })
+  const holen = (r: string[], k: string) => (z[k] !== undefined ? (r[z[k]] || "").trim() : "")
+  const vorhanden = new Set(D.OBJEKTE.map((o: any) => (o.strasse + o.hausnr + o.plz).toLowerCase().replace(/\s/g, "")))
+  const daten = zeilen.slice(1).map((r) => {
+    const o = { strasse: holen(r, "strasse"), hausnr: holen(r, "hausnr"), plz: holen(r, "plz"), ort: holen(r, "ort"), we: Number(holen(r, "we")) || 1, lat: Number(holen(r, "lat").replace(",", ".")), lng: Number(holen(r, "lng").replace(",", ".")) }
+    const doppelt = vorhanden.has((o.strasse + o.hausnr + o.plz).toLowerCase().replace(/\s/g, ""))
+    return { o, ok: !!o.strasse && !doppelt, grund: !o.strasse ? "Straße fehlt" : doppelt ? "gibt es schon" : "" }
+  })
+  const neu = daten.filter((d) => d.ok)
+  return (
+    <Card>
+      <CardHeader><CardTitle>Häuser importieren</CardTitle><CardDescription>Adresslisten vom Partner: je Zeile ein Haus mit Anzahl Wohnungen. Mit Koordinaten erscheinen die Häuser auf der Karte.</CardDescription></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <BereichWahl bereich="d2d" setBereich={setBereich} />
+          <div className="grid gap-1.5"><Label htmlFor="hm2" className="text-xs text-muted-foreground">Partner</Label>
+            <NativeSelect id="hm2" value={mandat} onChange={(e) => setMandat(e.target.value)}>{mandate.map((m: any) => <NativeSelectOption key={m.id} value={m.id}>{m.name}</NativeSelectOption>)}</NativeSelect></div>
+          <div className="grid gap-1.5"><Label htmlFor="hb2" className="text-xs text-muted-foreground">Vertriebler</Label>
+            <NativeSelect id="hb2" value={betreuer} onChange={(e) => setBetreuer(e.target.value)}>{leute.map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}</NativeSelect></div>
+        </div>
+        <Textarea value={text} onChange={(e) => setText(e.target.value)} className="min-h-28 font-mono text-xs" aria-label="Häuser einfügen" placeholder={"Straße\tHausnummer\tPLZ\tOrt\tWohnungen\tBreitengrad\tLängengrad\nKoppenstraße\t12\t10243\tBerlin\t24\t52.5112\t13.4331"} />
+        {zeilen.length > 1 && <p className="text-sm text-muted-foreground">{neu.length} neue Häuser mit {neu.reduce((s, d) => s + d.o.we, 0)} Wohnungen · {daten.length - neu.length} übersprungen{Object.keys(z).length < 2 ? " · Überschriften nicht erkannt, bitte Straße/Hausnummer/PLZ/Ort/Wohnungen als erste Zeile" : ""}</p>}
+      </CardContent>
+      {neu.length > 0 && <CardFooter><Button onClick={() => {
+        neu.forEach(({ o }) => D.objektAnlegen({ mandat, strasse: o.strasse, hausnr: o.hausnr, plz: o.plz, ort: o.ort, we: o.we, betreuer, geo: o.lat && o.lng ? { lat: o.lat, lng: o.lng } : null }, ui.ich))
+        bump(); toast(M.plural(neu.length, "Haus", "Häuser") + " importiert"); setText("")
+      }}><Upload />{M.plural(neu.length, "Haus", "Häuser")} importieren</Button></CardFooter>}
+    </Card>
+  )
+}
+
+function LeadImport({ bereich, setBereich }: { bereich: string; setBereich: (b: string) => void }) {
+  const ui = useUI()
   const mandate = M.MANDATE.filter((m: any) => m.bereich === bereich && m.status !== "beendet")
   const [mandat, setMandat] = React.useState<string>("")
   const leute = M.PERSONEN.filter((p: any) => p.aktiv !== false && (bereich === "standort" ? p.rolle === "hv" : p.rolle !== "hv"))
@@ -144,8 +207,7 @@ function Import() {
       <CardHeader><CardTitle>Leads importieren</CardTitle><CardDescription>CSV-Datei hochladen oder Zellen direkt aus Excel kopieren und einfügen. Dubletten und gesperrte Nummern werden erkannt.</CardDescription></CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="grid gap-1.5"><Label htmlFor="ib" className="text-xs text-muted-foreground">Bereich</Label>
-            <NativeSelect id="ib" value={bereich} onChange={(e) => setBereich(e.target.value)}>{M.BEREICHE.map((b: any) => <NativeSelectOption key={b.id} value={b.id}>{b.name}</NativeSelectOption>)}</NativeSelect></div>
+          <BereichWahl bereich={bereich} setBereich={setBereich} />
           <div className="grid gap-1.5"><Label htmlFor="im" className="text-xs text-muted-foreground">Mandat</Label>
             <NativeSelect id="im" value={mandat} onChange={(e) => setMandat(e.target.value)}>{mandate.map((m: any) => <NativeSelectOption key={m.id} value={m.id}>{m.name}</NativeSelectOption>)}</NativeSelect></div>
           <div className="grid gap-1.5"><Label htmlFor="iw" className="text-xs text-muted-foreground">Betreut von</Label>

@@ -57,9 +57,11 @@ type Props = {
   fokus?: { lat: number; lng: number } | null
   klein?: boolean
   className?: string
+  objekte?: { id: string; geo: { lat: number; lng: number }; farbe: string; titel: string; radius?: number }[]
+  onObjekt?: (id: string) => void
 }
 
-export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, hervorheben, punkt, fokus, klein, className }: Props) {
+export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, hervorheben, punkt, fokus, klein, className, objekte, onObjekt }: Props) {
   const box = React.useRef<HTMLDivElement>(null)
   const map = React.useRef<L.Map | null>(null)
   const kachel = React.useRef<L.TileLayer | null>(null)
@@ -68,7 +70,7 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
   const pins = React.useRef<L.LayerGroup | null>(null)
   const dunkel = useDunkel()
   const kacheln = useKacheln()
-  const cb = React.useRef({ onUnit, onLead }); cb.current = { onUnit, onLead }
+  const cb = React.useRef({ onUnit, onLead, onObjekt }); cb.current = { onUnit, onLead, onObjekt }
   const units = React.useMemo(() => K.UNITS.filter((u: any) => u.stadt === stadt), [stadt])
   const aktuell = React.useRef({ units, stadt, klein }); aktuell.current = { units, stadt, klein }
 
@@ -168,24 +170,33 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
       }
       g.addLayer(c)
     })
+    ;(objekte || []).forEach((o) => {
+      const c = L.circleMarker([o.geo.lat, o.geo.lng], { radius: o.radius || 7, color: dunkel ? "#0a0f1c" : "#ffffff", weight: 2, fillColor: o.farbe, fillOpacity: 1, pane: "pins", interactive: !klein, bubblingMouseEvents: false })
+      if (!klein) { c.bindTooltip(o.titel, { direction: "top", offset: [0, -6], className: "lumio-tip" }); c.on("click", () => cb.current.onObjekt?.(o.id)) }
+      g.addLayer(c)
+    })
     if (punkt) {
       if (punkt.genau) g.addLayer(L.circle([punkt.lat, punkt.lng], { pane: "pins", radius: punkt.genau, color: "#4d6cf0", weight: 1, fillColor: "#4d6cf0", fillOpacity: 0.12, interactive: false }))
       g.addLayer(L.circleMarker([punkt.lat, punkt.lng], { pane: "pins", radius: 9, color: "#ffffff", weight: 3, fillColor: "#4d6cf0", fillOpacity: 1, interactive: false }))
     }
-  }, [leads, punkt?.lat, punkt?.lng, punkt?.genau, dunkel, version, klein])
+  }, [leads, objekte, punkt?.lat, punkt?.lng, punkt?.genau, dunkel, version, klein])
 
   // Ausschnitt: Punkt > Fokus > Gebiet des Vertrieblers > ganze Stadt
   React.useEffect(() => {
     const m = map.current; if (!m) return
     if (punkt) { m.setView([punkt.lat, punkt.lng], klein ? 15 : 16); return }
     if (fokus) { m.setView([fokus.lat, fokus.lng], 15); return }
+    if (objekte && objekte.length) {
+      const bo = L.latLngBounds(objekte.map((o) => [o.geo.lat, o.geo.lng] as [number, number]))
+      m.fitBounds(bo.pad(0.15), { maxZoom: 16 }); return
+    }
     const eigene = hervorheben ? units.filter((u: any) => K.besitzer(u) === hervorheben) : []
     const basis = eigene.length ? eigene : units
     if (!basis.length) return
     const b = L.latLngBounds([])
     basis.forEach((u: any) => { b.extend([u.bbox[0], u.bbox[1]]); b.extend([u.bbox[2], u.bbox[3]]) })
     m.fitBounds(b, { padding: [16, 16] })
-  }, [stadt, hervorheben, punkt?.lat, punkt?.lng, fokus?.lat, fokus?.lng])
+  }, [stadt, hervorheben, punkt?.lat, punkt?.lng, fokus?.lat, fokus?.lng, objekte ? objekte.length : -1])
 
   return <div ref={box} className={cn("isolate z-0 overflow-hidden", className)} role="application" aria-label={"Karte " + (K.STAEDTE.find((s: any) => s.id === stadt)?.name ?? "")} />
 }

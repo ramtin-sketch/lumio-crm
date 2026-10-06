@@ -18,6 +18,7 @@ import { Team } from "@/views/team"
 import { Verdienst } from "@/views/verdienst"
 import { Uebergaben, MeineTermine } from "@/views/uebergaben"
 import { Karte } from "@/views/karte"
+import { D2D } from "@/views/d2d"
 import { ErfassenSheet } from "@/erfassen"
 import { LeadSheet } from "@/lead-sheet"
 import { NeuSheet } from "@/neu-sheet"
@@ -30,7 +31,7 @@ import { ImportExport } from "@/views/import"
 const TITEL: Record<string, string> = {
   heute: "Heute", dashboard: "Dashboard", werbung: "Werbemandate", bildung: "Weiterbildung", standort: "Standortakquise", karte: "Karte",
   anrufen: "Anrufen", mandate: "Mandate", team: "Team & Provisionen", verdienst: "Mein Verdienst",
-  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sperrliste", import: "Import & Export",
+  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sperrliste", d2d: "Door-to-Door", import: "Import & Export",
 }
 
 function SyncAnzeige() {
@@ -79,6 +80,7 @@ function Inhalt() {
     case "uebergaben": return <Uebergaben />
     case "termine": return <MeineTermine />
     case "karte": return <Karte />
+    case "d2d": return <D2D />
     case "datenschutz": return <Datenschutz />
     case "import": return <ImportExport />
   }
