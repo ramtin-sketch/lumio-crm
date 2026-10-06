@@ -64,7 +64,9 @@ export async function laden(session: Session) {
   profile.forEach((p: any) => Object.assign(p, privatVon.get(p.id) || {}))
   gespeichert.clear()
 
-  const personen = profile.map((p: any, i: number) => ({
+  const systemkonten = profile.filter((p: any) => p.rolle === "assistent")
+  ;(M.SYSTEM_PERSONEN as any[]).splice(0, M.SYSTEM_PERSONEN.length, ...systemkonten.map((p: any) => ({ id: p.id, name: p.name, voll: p.name, rolle: "system", kurz: p.kurz || "AI", farbe: p.farbe || "#7048e8", aktiv: true, d2d: {} })))
+  const personen = profile.filter((p: any) => p.rolle !== "assistent").map((p: any, i: number) => ({
     id: p.id, name: (p.name || p.email || "?").split(" ")[0], voll: p.name || p.email, rolle: ROLLE_APP[p.rolle] || "setter", dbRolle: p.rolle,
     kurz: p.kurz || (p.name || "?").split(/\s+/).map((t: string) => t[0]).join("").slice(0, 2).toUpperCase(),
     farbe: p.farbe || FARBEN[i % FARBEN.length], stadt: p.stadt || null, gebiet: p.gebiet || "", email: p.email, aktiv: p.aktiv,
@@ -620,4 +622,20 @@ async function verarbeiten() {
     geaendert = true
   }
   if (geaendert) liveZeichnen()
+}
+
+/* ---------- Claude-Verbindung (eingeschränkt, nur Geschäftsführung richtet sie ein) ---------- */
+export async function claudeStand() {
+  const { data, error } = await sb.from("claude_schluessel").select("id, erstellt_am, erstellt_von, zuletzt_benutzt, aktiv").order("erstellt_am", { ascending: false }).limit(5)
+  if (error) throw new Error(uebersetzen(error.message))
+  return (data || []) as { id: number; erstellt_am: string; erstellt_von: string | null; zuletzt_benutzt: string | null; aktiv: boolean }[]
+}
+export async function claudeEinrichten() {
+  const { data, error } = await sb.rpc("claude_schluessel_erstellen")
+  if (error) throw new Error(uebersetzen(error.message))
+  return `${SUPABASE_URL}/functions/v1/claude-verbindung/${data}`
+}
+export async function claudeSperren() {
+  const { error } = await sb.rpc("claude_schluessel_sperren")
+  if (error) throw new Error(uebersetzen(error.message))
 }

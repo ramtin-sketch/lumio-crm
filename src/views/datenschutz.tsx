@@ -9,13 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Seitenkopf } from "@/bits"
 import { bump, useDaten, useUI } from "@/store"
-import { protokollLaden, hinweiseLaden, anmeldungenLaden, sicherungenLaden, sicherungErstellen, sicherungHerunterladen, ABMELDEN_NACH_STUNDEN } from "@/daten/echt"
+import { protokollLaden, hinweiseLaden, anmeldungenLaden, sicherungenLaden, sicherungErstellen, sicherungHerunterladen, ABMELDEN_NACH_STUNDEN, claudeStand, claudeEinrichten, claudeSperren } from "@/daten/echt"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
-import { AlertTriangle, CheckCircle2, Download, Info, Loader2, ShieldBan, DatabaseBackup } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Copy, Download, Info, Loader2, ShieldBan, DatabaseBackup, Bot, Ban } from "lucide-react"
 
 const GRUENDE = ["Werbewiderspruch", "Will keine Anrufe", "Wunsch des Kunden", "Falsche Nummer", "Sonstiges"]
-const TABELLEN: Record<string, string> = { lead: "Lead", kontakt: "Ansprechpartner", abschluss: "Abschluss", mandat: "Mandat", gebiet: "Gebiet", sperrliste: "Sperrliste", profil: "Zugang", profil_vorbelegung: "Zugang" }
+const TABELLEN: Record<string, string> = { claude_schluessel: "Claude-Verbindung", lead: "Lead", kontakt: "Ansprechpartner", abschluss: "Abschluss", mandat: "Mandat", gebiet: "Gebiet", sperrliste: "Sperrliste", profil: "Zugang", profil_vorbelegung: "Zugang" }
 const FELDER: Record<string, string> = { stufe: "Phase", betreuer_id: "Betreut von", setter_id: "Setter", closer_id: "Closer", name: "Name", telefon: "Telefon", email: "E-Mail",
   next_datum: "Nächster Schritt", next_text: "Was", verlustgrund: "Grund", status: "Status", profil_id: "Vertriebler", aktiv: "Aktiv", rolle: "Rolle", adresse: "Adresse" }
 
@@ -175,6 +175,7 @@ function Sicherheit() {
       <Hinweise echt={ui.echt} />
       <Sicherungen echt={ui.echt} />
       <Anmeldungen echt={ui.echt} />
+      <ClaudeVerbindung echt={ui.echt} />
     </div>
   )
 }
@@ -238,6 +239,53 @@ function Sicherungen({ echt }: { echt: boolean }) {
                 {!daten.length && <TableRow><TableCell colSpan={3} className="py-8 text-center text-muted-foreground">Noch keine Sicherung.</TableCell></TableRow>}
               </TableBody>
             </Table>}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ClaudeVerbindung({ echt }: { echt: boolean }) {
+  const [stand, setStand] = React.useState<any[] | null>(null)
+  const [url, setUrl] = React.useState<string | null>(null)
+  const [laeuft, setLaeuft] = React.useState(false)
+  const laden = React.useCallback(() => { if (echt) claudeStand().then(setStand).catch(() => setStand([])) }, [echt])
+  React.useEffect(() => { laden() }, [laden])
+  const aktiv = stand?.find((x) => x.aktiv)
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="size-4" />Claude-Verbindung</CardTitle>
+        <CardDescription>Damit du Claude im Chat sagen kannst, was ins CRM soll. Claude arbeitet dabei als eigenes Konto „Claude (Assistent)“ und darf nur Leads, Ansprechpartner, Notizen, Termine und die Sperrliste lesen und schreiben. Nichts löschen, keine Abschlüsse, keine Provisionen, kein Door-to-Door, keine Zugänge. Jede Änderung steht im Protokoll.</CardDescription></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {!echt ? <NurEcht text="In der echten App richtest du hier die Verbindung ein." /> : !stand ? <Laedt /> : (
+          <>
+            <div className="flex items-center gap-2">{aktiv
+              ? <><Badge variant="outline" className="border-transparent bg-ok/15 text-ok">aktiv</Badge><span className="text-muted-foreground">seit {zeitText(aktiv.erstellt_am)}{aktiv.zuletzt_benutzt ? " · zuletzt benutzt " + zeitText(aktiv.zuletzt_benutzt) : " · noch nicht benutzt"}</span></>
+              : <><Badge variant="outline" className="text-muted-foreground">aus</Badge><span className="text-muted-foreground">Keine Verbindung eingerichtet.</span></>}</div>
+            {url && (
+              <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
+                <div className="font-medium">Deine Verbindungsadresse (wird nur jetzt angezeigt)</div>
+                <code className="block break-all font-mono text-xs">{url}</code>
+                <Button size="sm" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(url); toast("Adresse kopiert") } catch (e) { toast("Kopieren ging nicht, bitte markieren und kopieren") } }}><Copy />Adresse kopieren</Button>
+                <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                  <li>In Claude: Anpassen → Connectors → „+“ → „Eigenen Connector hinzufügen“.</li>
+                  <li>Name: LUMIO CRM. Adresse einfügen. Anmeldung: keine.</li>
+                  <li>Im Chat sagen, was ins CRM soll. Claude zeigt dir vor jedem Eintrag, was es schreiben will.</li>
+                </ol>
+                <p className="text-xs text-muted-foreground">Die Adresse ist wie ein Passwort: nicht weitergeben, nicht per E-Mail schicken. Wer sie hat, kann das tun, was Claude hier darf.</p>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={laeuft} onClick={async () => {
+                setLaeuft(true)
+                try { setUrl(await claudeEinrichten()); laden() } catch (e: any) { toast(e.message) } finally { setLaeuft(false) }
+              }}>{laeuft ? <Loader2 className="animate-spin" /> : <Bot />}{aktiv ? "Neue Adresse erzeugen (alte wird ungültig)" : "Verbindung einrichten"}</Button>
+              {aktiv && <Button size="sm" variant="outline" className="text-destructive" disabled={laeuft} onClick={async () => {
+                setLaeuft(true)
+                try { await claudeSperren(); setUrl(null); laden(); toast("Claude-Verbindung gesperrt") } catch (e: any) { toast(e.message) } finally { setLaeuft(false) }
+              }}><Ban />Sofort sperren</Button>}
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )

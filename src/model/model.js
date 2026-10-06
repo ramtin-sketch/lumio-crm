@@ -133,7 +133,9 @@ const LEADS = [];
 const MODUS = { echt: false };
 const neueId = () => (MODUS.echt ? crypto.randomUUID() : NEXT_ID++);
 function mandat(id){ return MANDATE.find(m => m.id === id); }
-function person(id){ return PERSONEN.find(p => p.id === id) || null; }
+/* Systemkonten (z. B. Claude-Verbindung): nur für Namen im Verlauf, nicht in Auswahllisten */
+const SYSTEM_PERSONEN = [];
+function person(id){ return PERSONEN.find(p => p.id === id) || SYSTEM_PERSONEN.find(p => p.id === id) || null; }
 function lead(o){
   const l = Object.assign({
     id: neueId(), felder: {}, kontakte: [], verlauf: [], next: null, temp: 0,
@@ -710,7 +712,7 @@ function umsatzMonat(mo, filter){ return LEADS.reduce((s, l) => s + (l.abschluss
 
 export {
   T0, HEUTE, MONAT, tag, ym, ymAdd, tageZwischen, iso,
-  PERSONEN, ZIEL_HV, MANDATE, STUFEN, EINWAENDE, LEADS, ANRUF_TAGE,
+  PERSONEN, SYSTEM_PERSONEN, ZIEL_HV, MANDATE, STUFEN, EINWAENDE, LEADS, ANRUF_TAGE,
   mandat, person, stufeVon, istOffen, lumioGesamt, kundenwert, umsatzImMonat, hvAnteil, laufendImMonat,
   hochrechnungMonat, schaetzwert, pipelineGewichtet, ZEITRAEUME, monateVon, imZeitraum, anrufeImZeitraum, anrufTag,
   MONATSNAMEN, WOCHENTAGE, eur, zahl, prozent, dKurz, monatName, wann, faellig, ueberfaellig,
