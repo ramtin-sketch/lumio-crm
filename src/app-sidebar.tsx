@@ -10,12 +10,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useUI, useDaten, type Ansicht } from "@/store"
 import * as M from "@/model/model.js"
 import * as D from "@/model/d2d.js"
-import { abmelden } from "@/daten/echt"
+import { abmelden, ueberallAbmelden, zweifaktorStand, hinweiseLaden } from "@/daten/echt"
+import { ZweifaktorEinrichten } from "@/zweifaktor"
+import { Button } from "@/components/ui/button"
 import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Map as MapIcon, ShieldCheck, CalendarCheck, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -30,6 +32,20 @@ export function AppSidebar() {
   const meineUebergaben = M.TERMINE.filter((t: any) => t.status === "geplant" && t.closer === ui.ich).length
   const neuTerminieren = M.LEADS.filter((l: any) => l.terminStatus === "noshow" && M.istOffen(l) && l.betreuer === ui.ich).length
   const anrufListe = M.LEADS.filter((l: any) => M.istTel(l) && M.istOffen(l) && (l.stufe === "recherche" || l.stufe === "setting") && l.betreuer === ui.ich && !M.istGesperrt(l)).length
+
+  // Neue Warnungen (letzte 7 Tage, noch nicht angesehen) als Zahl am Menüpunkt
+  const [warnungen, setWarnungen] = React.useState(0)
+  React.useEffect(() => {
+    if (!ui.echt || !ui.istGF) return
+    const zaehlen = () => hinweiseLaden(7).then((h) => {
+      let gesehen = 0; try { gesehen = Number(localStorage.getItem("lumio-hinweise-gesehen") || 0) } catch (e) {}
+      setWarnungen(h.filter((x) => x.stufe === "warnung" && new Date(x.zeit).getTime() > gesehen).length)
+    }).catch(() => {})
+    zaehlen()
+    window.addEventListener("lumio-hinweise-gesehen", zaehlen)
+    const t = setInterval(zaehlen, 10 * 60000)
+    return () => { window.removeEventListener("lumio-hinweise-gesehen", zaehlen); clearInterval(t) }
+  }, [ui.echt, ui.istGF])
 
   const gruppen: { label: string; punkte: Punkt[] }[] = ui.istGF
     ? [
@@ -50,7 +66,7 @@ export function AppSidebar() {
           { id: "mandate", titel: "Mandate", icon: Building2 },
           { id: "team", titel: "Team & Provisionen", icon: Users },
           { id: "import", titel: "Import & Export", icon: FileSpreadsheet },
-          { id: "datenschutz", titel: "Datenschutz", icon: ShieldCheck },
+          { id: "datenschutz", titel: "Datenschutz", icon: ShieldCheck, zahl: warnungen },
         ] },
       ]
     : ich.rolle === "setter" ? [
@@ -78,6 +94,8 @@ export function AppSidebar() {
     setDunkel(d)
   }
   const [pwOffen, setPwOffen] = React.useState(false)
+  const [zfOffen, setZfOffen] = React.useState(false)
+  const [ueberallOffen, setUeberallOffen] = React.useState(false)
   const gehe = (a: Ansicht) => { ui.geheZu(a); if (isMobile) setOpenMobile(false) }
 
   return (
@@ -145,8 +163,10 @@ export function AppSidebar() {
                   <>
                     <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{ich.email}</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => setPwOffen(true)}><KeyRound />Passwort ändern</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setZfOffen(true)}><Smartphone />Zwei-Faktor-Anmeldung</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => abmelden()}><LogOut />Abmelden</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setUeberallOffen(true)}><MonitorSmartphone />Auf allen Geräten abmelden</DropdownMenuItem>
                   </>
                 ) : (<>
                 <DropdownMenuLabel className="text-xs text-muted-foreground">Demo: Ansicht wechseln als</DropdownMenuLabel>
@@ -173,6 +193,37 @@ export function AppSidebar() {
           <PasswortFormular onFertig={() => { setPwOffen(false); toast("Neues Passwort gespeichert") }} />
         </DialogContent>
       </Dialog>
+      <Dialog open={zfOffen} onOpenChange={setZfOffen}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-md">
+          <DialogHeader><DialogTitle>Zwei-Faktor-Anmeldung</DialogTitle><DialogDescription>Beim Anmelden zusätzlich ein Code vom Handy. Ein geklautes Passwort allein reicht dann nicht mehr.</DialogDescription></DialogHeader>
+          {zfOffen && <ZweifaktorVerwalten onFertig={() => setZfOffen(false)} />}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={ueberallOffen} onOpenChange={setUeberallOffen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Auf allen Geräten abmelden?</DialogTitle><DialogDescription>Du wirst auf jedem Handy und Rechner abgemeldet, auch hier. Sinnvoll, wenn ein Gerät verloren gegangen ist.</DialogDescription></DialogHeader>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setUeberallOffen(false)}>Abbrechen</Button>
+            <Button onClick={async () => { try { await ueberallAbmelden() } catch (e: any) { toast(e.message) } }}><MonitorSmartphone />Überall abmelden</Button></div>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
+  )
+}
+
+function ZweifaktorVerwalten({ onFertig }: { onFertig: () => void }) {
+  const [stand, setStand] = React.useState<{ faktoren: any[] } | null>(null)
+  const [neu, setNeu] = React.useState(false)
+  React.useEffect(() => { zweifaktorStand().then(setStand).catch((e) => { toast(e.message); setStand({ faktoren: [] }) }) }, [])
+  if (!stand) return <div className="flex justify-center py-6"><Loader2 className="animate-spin text-muted-foreground" /></div>
+  const fertig = () => { toast("Zwei-Faktor-Anmeldung ist eingerichtet"); onFertig() }
+  if (!stand.faktoren.length || neu) return <ZweifaktorEinrichten ersetzen={neu} onFertig={fertig} />
+  const f = stand.faktoren[0]
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-start gap-3 rounded-lg border p-3"><CheckCircle2 className="mt-0.5 size-5 shrink-0 text-ok" />
+        <div className="text-sm"><div className="font-medium">Ist eingerichtet</div><div className="text-muted-foreground">Seit {new Date(f.created_at).toLocaleDateString("de-DE")}. Beim Anmelden fragt die App nach dem Code.</div></div></div>
+      <Button variant="outline" onClick={() => setNeu(true)}><Smartphone />Neues Handy einrichten</Button>
+      <p className="text-xs text-muted-foreground">Das alte Handy funktioniert danach nicht mehr. Handy verloren und kein Zugang mehr? Die Geschäftsführung kann die Zwei-Faktor-Anmeldung unter Team → Zugänge zurücksetzen.</p>
+    </div>
   )
 }

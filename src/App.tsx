@@ -31,7 +31,7 @@ import { ImportExport } from "@/views/import"
 const TITEL: Record<string, string> = {
   heute: "Heute", dashboard: "Dashboard", werbung: "Werbemandate", bildung: "Weiterbildung", standort: "Standortakquise", karte: "Karte",
   anrufen: "Anrufen", mandate: "Mandate", team: "Team & Provisionen", verdienst: "Mein Verdienst",
-  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sperrliste", d2d: "Door-to-Door", import: "Import & Export",
+  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sicherheit", d2d: "Door-to-Door", import: "Import & Export",
 }
 
 function SyncAnzeige() {

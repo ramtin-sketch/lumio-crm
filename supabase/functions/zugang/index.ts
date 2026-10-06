@@ -1,4 +1,5 @@
-// Zugänge verwalten: nur die Geschäftsführung darf Nutzer anlegen, sperren und Passwörter zurücksetzen.
+// Zugänge verwalten: nur die Geschäftsführung (mit bestätigter Zwei-Faktor-Anmeldung) darf Nutzer anlegen,
+// sperren, Passwörter und die Zwei-Faktor-Anmeldung zurücksetzen.
 // Der Service-Schlüssel kommt aus der Umgebung der Funktion und verlässt den Server nie.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -74,6 +75,18 @@ Deno.serve(async (req) => {
       const { error: e2 } = await admin.from("profil").update({ aktiv }).eq("id", String(b.id));
       if (e2) throw e2;
       return antwort({ aktiv });
+    }
+
+    if (b.aktion === "zweifaktor_zuruecksetzen") {
+      // z. B. Handy verloren: alle zweiten Faktoren der Person entfernen, beim nächsten Anmelden richtet sie neu ein
+      const id = String(b.id);
+      const { data: f, error: e1 } = await admin.auth.admin.mfa.listFactors({ userId: id });
+      if (e1) throw e1;
+      for (const x of f?.factors ?? []) {
+        const { error: e2 } = await admin.auth.admin.mfa.deleteFactor({ id: x.id, userId: id });
+        if (e2) throw e2;
+      }
+      return antwort({ entfernt: (f?.factors ?? []).length });
     }
 
     return antwort({ fehler: "Unbekannte Aktion" }, 400);

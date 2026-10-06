@@ -328,10 +328,53 @@ if (ECHT && typeof window !== "undefined") {
 /* ---------- Anmelden ---------- */
 export async function anmelden(email: string, passwort: string) {
   const { data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: passwort })
-  if (error) throw new Error(/invalid/i.test(error.message) ? "E-Mail oder Passwort stimmt nicht." : /banned/i.test(error.message) ? "Dieser Zugang ist gesperrt." : error.message)
+  if (error) throw new Error(/invalid/i.test(error.message) ? "E-Mail oder Passwort stimmt nicht." : /banned/i.test(error.message) ? "Dieser Zugang ist gesperrt." : /rate|too many/i.test(error.message) ? "Zu viele Versuche. Bitte ein paar Minuten warten." : error.message)
+  aktivitaetMerken()
   return data.session
 }
 export async function abmelden() { await sb.auth.signOut() }
+/* Auf allen Handys und Rechnern abmelden (z. B. wenn ein Gerät verloren ging) */
+export async function ueberallAbmelden() { await sb.auth.signOut({ scope: "global" }) }
+
+/* ---------- Automatisch abmelden nach 12 Stunden ohne Nutzung ---------- */
+const ZULETZT = "lumio-zuletzt"
+export const ABMELDEN_NACH_STUNDEN = 12
+export function aktivitaetMerken() { try { localStorage.setItem(ZULETZT, String(Date.now())) } catch (e) {} }
+export function zuLangeWeg() {
+  try { const z = Number(localStorage.getItem(ZULETZT) || 0); return z > 0 && Date.now() - z > ABMELDEN_NACH_STUNDEN * 3600 * 1000 } catch (e) { return false }
+}
+
+/* ---------- Zwei-Faktor-Anmeldung (Code aus einer Authenticator-App) ---------- */
+export async function zweifaktorStand() {
+  const { data: { session } } = await sb.auth.getSession()
+  if (!session) return { stufe: null, ziel: null, faktoren: [] as any[] }
+  const { data, error } = await sb.auth.mfa.getAuthenticatorAssuranceLevel(session.access_token)
+  if (error) throw new Error(error.message)
+  const { data: f } = await sb.auth.mfa.listFactors()
+  return { stufe: data.currentLevel, ziel: data.nextLevel, faktoren: (f?.totp || []) as any[] }
+}
+export async function zweifaktorPflicht() {
+  const { data, error } = await sb.rpc("zweifaktor_pflicht")
+  if (error) throw new Error(error.message)
+  return !!data
+}
+export async function zweifaktorStarten() {
+  const { data: f } = await sb.auth.mfa.listFactors()
+  for (const x of (f?.all || []).filter((x: any) => x.status !== "verified")) await sb.auth.mfa.unenroll({ factorId: x.id })
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", issuer: "LUMIO", friendlyName: "Handy " + new Date().toISOString().slice(0, 16).replace("T", " ") })
+  if (error) throw new Error(error.message)
+  return { id: data.id as string, qr: data.totp.qr_code as string, geheim: data.totp.secret as string, uri: data.totp.uri as string }
+}
+export async function zweifaktorBestaetigen(factorId: string, code: string) {
+  const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\D/g, "") })
+  if (error) throw new Error(/invalid|expired|code/i.test(error.message) ? "Der Code stimmt nicht. Bitte den aktuellen Code aus der App eingeben." : /rate|too many/i.test(error.message) ? "Zu viele Versuche. Bitte kurz warten." : error.message)
+  aktivitaetMerken()
+}
+/* Alte Handys entfernen, nachdem ein neues eingerichtet wurde */
+export async function andereFaktorenEntfernen(behalten: string) {
+  const { data: f } = await sb.auth.mfa.listFactors()
+  for (const x of (f?.all || []).filter((x: any) => x.id !== behalten)) await sb.auth.mfa.unenroll({ factorId: x.id })
+}
 export async function passwortAendern(neu: string) {
   const { error } = await sb.auth.updateUser({ password: neu, data: { passwort_aendern: false } })
   if (error) throw new Error(/should be different/i.test(error.message) ? "Bitte ein anderes Passwort als das bisherige nehmen." : /weak|at least/i.test(error.message) ? "Das Passwort ist zu schwach. Mindestens 8 Zeichen." : error.message)
@@ -377,4 +420,47 @@ export async function protokollLaden(filter: { tabelle?: string; datensatz?: str
 export async function anonymisieren(art: "lead" | "kontakt", id: string, grund: string) {
   const { error } = await sb.rpc(art === "lead" ? "lead_anonymisieren" : "kontakt_anonymisieren", art === "lead" ? { p_lead: id, p_grund: grund } : { p_kontakt: id, p_grund: grund })
   if (error) throw new Error(uebersetzen(error.message))
+}
+
+/* ---------- Sicherheit (nur Geschäftsführung) ---------- */
+export async function teamSicherheit() {
+  const { data, error } = await sb.rpc("team_sicherheit")
+  if (error) throw new Error(uebersetzen(error.message))
+  return (data || []) as { id: string; hat_faktor: boolean; pflicht: boolean; letzte_anmeldung: string | null; sitzungen: number }[]
+}
+export async function pflichtSetzen(id: string, wert: boolean) {
+  const { error } = await sb.from("profil").update({ zweifaktor_pflicht: wert }).eq("id", id)
+  if (error) throw new Error(uebersetzen(error.message))
+}
+export async function hinweiseLaden(tage = 30) {
+  const { data, error } = await sb.rpc("sicherheit_hinweise", { p_tage: tage })
+  if (error) throw new Error(uebersetzen(error.message))
+  return (data || []) as { zeit: string; stufe: "info" | "warnung"; art: string; profil_id: string | null; text: string }[]
+}
+export async function anmeldungenLaden() {
+  const { data, error } = await sb.from("anmeldung").select("*").order("zeit", { ascending: false }).limit(100)
+  if (error) throw new Error(uebersetzen(error.message))
+  return data as any[]
+}
+export async function sicherungenLaden() {
+  const { data, error } = await sb.from("sicherung").select("id, erstellt_am, art, erstellt_von, tabellen, groesse_kb").order("erstellt_am", { ascending: false }).limit(30)
+  if (error) throw new Error(uebersetzen(error.message))
+  return data as any[]
+}
+export async function sicherungErstellen() {
+  const { error } = await sb.rpc("sicherung_erstellen")
+  if (error) throw new Error(uebersetzen(error.message))
+}
+export async function sicherungHerunterladen(id: number) {
+  const { data, error } = await sb.from("sicherung").select("erstellt_am, daten").eq("id", id).single()
+  if (error) throw new Error(uebersetzen(error.message))
+  if (!data?.daten) throw new Error("Diese Sicherung ist schon älter als 14 Tage und nicht mehr vollständig vorhanden.")
+  const name = "LUMIO-Sicherung-" + String(data.erstellt_am).slice(0, 16).replace(/[T:]/g, "-") + ".json"
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ erstellt_am: data.erstellt_am, ...data.daten }, null, 1)], { type: "application/json" }))
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+}
+export async function exportMelden(art: string, anzahl: number) {
+  if (!ECHT) return
+  try { await sb.rpc("export_melden", { p_art: art, p_anzahl: anzahl }) } catch (e) {}
 }

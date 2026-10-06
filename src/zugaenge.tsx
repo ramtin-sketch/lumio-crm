@@ -10,11 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { PersonAvatar } from "@/bits"
 import { bump, useUI } from "@/store"
-import { zugang } from "@/daten/echt"
+import { zugang, teamSicherheit, pflichtSetzen } from "@/daten/echt"
 import * as K from "@/model/karte.js"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
-import { Copy, KeyRound, Loader2, MoreHorizontal, UserPlus, UserX, UserCheck } from "lucide-react"
+import { Copy, KeyRound, Loader2, MoreHorizontal, UserPlus, UserX, UserCheck, Smartphone, ShieldCheck, ShieldOff } from "lucide-react"
 
 const ROLLEN = [["setter", "Setter (Telefon)"], ["hv", "Handelsvertreter (draußen)"], ["closer", "Closer"], ["gf", "Geschäftsführung"]]
 const FARBEN = ["#3b5bdb", "#0ca678", "#e8590c", "#c2255c", "#7048e8", "#1098ad", "#f59f00", "#5c940d"]
@@ -26,6 +26,33 @@ export function Zugaenge() {
   const [neu, setNeu] = React.useState(false)
   const [ergebnis, setErgebnis] = React.useState<{ name: string; email: string; passwort: string } | null>(null)
   const nichtDemo = () => { if (!ui.echt) { toast("In der Demo werden keine echten Zugänge angelegt."); return false } return true }
+  const [sicher, setSicher] = React.useState<Record<string, { hat_faktor: boolean; pflicht: boolean; letzte_anmeldung: string | null }>>({})
+  const sicherLaden = React.useCallback(() => {
+    if (!ui.echt) return
+    teamSicherheit().then((r) => setSicher(Object.fromEntries(r.map((x) => [x.id, x])))).catch(() => {})
+  }, [ui.echt])
+  React.useEffect(() => { sicherLaden() }, [sicherLaden])
+
+  async function zfZuruecksetzen(p: any) {
+    if (!nichtDemo()) return
+    try { await zugang({ aktion: "zweifaktor_zuruecksetzen", id: p.id }); sicherLaden(); toast(p.voll + " richtet die Zwei-Faktor-Anmeldung beim nächsten Anmelden neu ein" + (sicher[p.id]?.pflicht ? "." : ", falls gewünscht.")) } catch (e: any) { toast(e.message) }
+  }
+  async function zfPflicht(p: any, wert: boolean) {
+    if (!nichtDemo()) return
+    try { await pflichtSetzen(p.id, wert); sicherLaden(); toast(wert ? "Zwei-Faktor ist jetzt Pflicht für " + p.voll : "Zwei-Faktor ist für " + p.voll + " freiwillig") } catch (e: any) { toast(e.message) }
+  }
+  const zfBadge = (p: any) => {
+    const z = sicher[p.id]
+    if (!ui.echt) return null
+    if (!z) return <span className="text-xs text-muted-foreground">…</span>
+    return z.hat_faktor
+      ? <Badge variant="outline" className="gap-1 border-transparent bg-ok/15 text-ok"><ShieldCheck className="size-3" />an</Badge>
+      : <Badge variant="outline" className={"gap-1 border-transparent " + (z.pflicht ? "bg-warn/15 text-warn" : "bg-muted text-muted-foreground")}><ShieldOff className="size-3" />{z.pflicht ? "Pflicht, noch nicht eingerichtet" : "aus"}</Badge>
+  }
+  const zuletzt = (p: any) => {
+    const z = sicher[p.id]?.letzte_anmeldung
+    return z ? "zuletzt " + new Date(z).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ui.echt && sicher[p.id] ? "noch nie angemeldet" : ""
+  }
 
   async function passwort(p: any) {
     if (!nichtDemo()) return
@@ -39,25 +66,31 @@ export function Zugaenge() {
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
-        <div className="grid gap-1.5"><CardTitle>Zugänge</CardTitle><CardDescription>Wer sich anmelden darf und mit welcher Rolle.</CardDescription></div>
+        <div className="grid gap-1.5"><CardTitle>Zugänge</CardTitle><CardDescription>Wer sich anmelden darf und mit welcher Rolle. Für die Geschäftsführung ist die Zwei-Faktor-Anmeldung immer Pflicht.</CardDescription></div>
         <Button size="sm" onClick={() => nichtDemo() && setNeu(true)}><UserPlus />Zugang anlegen</Button>
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader><TableRow><TableHead>Person</TableHead><TableHead className="hidden sm:table-cell">Rolle</TableHead><TableHead className="hidden md:table-cell">E-Mail</TableHead><TableHead>Status</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Person</TableHead><TableHead className="hidden sm:table-cell">Rolle</TableHead><TableHead className="hidden md:table-cell">E-Mail</TableHead><TableHead>Status</TableHead>{ui.echt && <TableHead className="hidden sm:table-cell">Zwei-Faktor</TableHead>}<TableHead className="w-10" /></TableRow></TableHeader>
           <TableBody>
             {M.PERSONEN.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell><div className="flex items-center gap-2"><PersonAvatar id={p.id} /><div><div className="font-medium">{p.voll}</div><div className="text-xs text-muted-foreground sm:hidden">{rolleText(p)}</div></div></div></TableCell>
                 <TableCell className="hidden sm:table-cell">{rolleText(p)}{p.gebiet ? <span className="text-muted-foreground"> · {p.gebiet}</span> : null}</TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">{p.email || "—"}</TableCell>
-                <TableCell>{p.aktiv === false ? <Badge variant="outline" className="border-transparent bg-destructive/10 text-destructive">gesperrt</Badge> : <Badge variant="outline" className="border-transparent bg-ok/15 text-ok">aktiv</Badge>}</TableCell>
+                <TableCell>{p.aktiv === false ? <Badge variant="outline" className="border-transparent bg-destructive/10 text-destructive">gesperrt</Badge> : <Badge variant="outline" className="border-transparent bg-ok/15 text-ok">aktiv</Badge>}
+                  {ui.echt && <div className="mt-1 text-xs text-muted-foreground">{zuletzt(p)}</div>}<div className="mt-1 sm:hidden">{zfBadge(p)}</div></TableCell>
+                {ui.echt && <TableCell className="hidden sm:table-cell">{zfBadge(p)}</TableCell>}
                 <TableCell>
                   {p.id !== ui.ich && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label={"Aktionen für " + p.voll}><MoreHorizontal /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => passwort(p)}><KeyRound />Neues Startpasswort</DropdownMenuItem>
+                        {sicher[p.id]?.hat_faktor && <DropdownMenuItem onClick={() => zfZuruecksetzen(p)}><Smartphone />Zwei-Faktor zurücksetzen (Handy verloren)</DropdownMenuItem>}
+                        {p.rolle !== "gf" && ui.echt && (sicher[p.id]?.pflicht
+                          ? <DropdownMenuItem onClick={() => zfPflicht(p, false)}><ShieldOff />Zwei-Faktor freiwillig machen</DropdownMenuItem>
+                          : <DropdownMenuItem onClick={() => zfPflicht(p, true)}><ShieldCheck />Zwei-Faktor zur Pflicht machen</DropdownMenuItem>)}
                         {p.aktiv === false
                           ? <DropdownMenuItem onClick={() => aktiv(p, true)}><UserCheck />Wieder freischalten</DropdownMenuItem>
                           : <DropdownMenuItem onClick={() => aktiv(p, false)} className="text-destructive"><UserX />Zugang sperren</DropdownMenuItem>}

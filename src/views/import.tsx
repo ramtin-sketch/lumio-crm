@@ -12,7 +12,7 @@ import { bump, useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
 import * as D from "@/model/d2d.js"
 import { toast } from "sonner"
-import { ECHT } from "@/daten/echt"
+import { ECHT, exportMelden } from "@/daten/echt"
 import { Download, FileUp, Upload } from "lucide-react"
 
 /* ---------- CSV lesen und schreiben ---------- */
@@ -273,9 +273,10 @@ function Export() {
         k.name, k.funktion, k.tel, k.mail, M.istGesperrt(l) ? "ja" : "", l.abschluss?.datum, l.abschluss ? Math.round(M.lumioGesamt(l)) : "", l.angelegt]
     })
     herunterladen(`LUMIO-Leads-${M.HEUTE}.csv`, csvSchreiben(kopf, zeilen))
+    exportMelden("Leads", zeilen.length)
   }
-  const sperreCsv = () => herunterladen(`LUMIO-Sperrliste-${M.HEUTE}.csv`, csvSchreiben(["Telefon", "E-Mail", "Firma", "Grund", "Seit"],
-    M.SPERRLISTE.map((e: any) => [e.telefon, e.email, e.firma, e.grund, e.datum])))
+  const sperreCsv = () => { herunterladen(`LUMIO-Sperrliste-${M.HEUTE}.csv`, csvSchreiben(["Telefon", "E-Mail", "Firma", "Grund", "Seit"],
+    M.SPERRLISTE.map((e: any) => [e.telefon, e.email, e.firma, e.grund, e.datum]))); exportMelden("Sperrliste", M.SPERRLISTE.length) }
   return (
     <Card>
       <CardHeader><CardTitle>Exportieren</CardTitle><CardDescription>Als CSV für Excel. Enthält nur, was du sehen darfst.</CardDescription></CardHeader>
