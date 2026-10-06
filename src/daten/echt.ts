@@ -46,8 +46,8 @@ const anders = (schluessel: string, zeile: any) => gespeichert.get(schluessel) !
 
 export async function laden(session: Session) {
   const seit = M.ymAdd(M.MONAT, -6) + "-01"
-  const [profile, mandate, leads, termine, anrufe, gebiete, sperren, objekte, auftraege, besuche] = await Promise.all([
-    alle("profil"),
+  const [profile, mandate, leads, termine, anrufe, gebiete, sperren, objekte, auftraege, besuche, privat] = await Promise.all([
+    alle("profil", "id, name, rolle, aktiv, erstellt_am, kurz, farbe, stadt, gebiet"),
     alle("mandat", "*", (q) => q.order("id")),
     alle("lead", "*, kontakt(*), verlauf(*), abschluss(*)"),
     alle("termin"),
@@ -57,7 +57,11 @@ export async function laden(session: Session) {
     alle("objekt", "*, wohnung(*)"),
     alle("auftrag"),
     alle("besuch", "*", (q) => q.gte("zeit", seit)),
+    // E-Mail, Telefon, Provision und D2D-Ausweis: nur eigene, die Geschäftsführung sieht alle
+    sb.rpc("profil_privat").then(({ data, error }: any) => { if (error) throw new Error("profil: " + error.message); return data || [] }),
   ])
+  const privatVon = new Map((privat as any[]).map((x: any) => [x.id, x]))
+  profile.forEach((p: any) => Object.assign(p, privatVon.get(p.id) || {}))
   gespeichert.clear()
 
   const personen = profile.map((p: any, i: number) => ({
@@ -290,9 +294,14 @@ async function flush() {
     }
     const auftraege = D.AUFTRAEGE.filter((a: any) => anders("auftrag:" + a.id, auftragZeile(a))).map(auftragZeile)
     if (auftraege.length) {
-      const { error } = await sb.from("auftrag").upsert(auftraege)
-      if (error) throw new Error(error.message)
-      auftraege.forEach((z: any) => merke("auftrag:" + z.id, z))
+      // Einzeln speichern: Ein gesperrter (schon bestätigter) Auftrag soll die anderen nicht aufhalten
+      let auftragFehler: string | null = null
+      for (const z of auftraege) {
+        const { error } = await sb.from("auftrag").upsert(z)
+        if (error) { auftragFehler = /Geschäftsführung/.test(error.message) ? error.message : "Auftrag: " + error.message; merke("auftrag:" + z.id, z); continue }
+        merke("auftrag:" + z.id, z)
+      }
+      if (auftragFehler) throw new Error(auftragFehler)
     }
     for (const p of M.PERSONEN as any[]) {
       if (!anders("d2d:" + p.id, p.d2d || {})) continue
