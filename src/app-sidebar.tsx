@@ -104,11 +104,11 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent active:bg-transparent">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-[#0E1523] text-white dark:ring-1 dark:ring-white/15">
-                <svg viewBox="0 0 512 512" className="size-5" aria-hidden="true"><path d="M170 128h66v192h118v64H170z" fill="currentColor" /><circle cx="350" cy="168" r="38" fill="#4D6CF0" /></svg>
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-[#2244CC] text-white">
+                <svg viewBox="0 0 240 240" className="size-5" aria-hidden="true"><path d="M101 70H170V138M170 70L70 170" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold tracking-wide">LUMIO</span>
+                <span className="truncate font-semibold tracking-[0.12em]">LUMIO GROUP</span>
                 <span className="truncate text-xs text-muted-foreground">Vertriebszentrale</span>
               </div>
             </SidebarMenuButton>

@@ -16,10 +16,10 @@ import { PasswortFormular } from "@/passwort"
 function Logo() {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex size-10 items-center justify-center rounded-xl bg-[#0E1523] text-white dark:ring-1 dark:ring-white/15">
-        <svg viewBox="0 0 512 512" className="size-6" aria-hidden="true"><path d="M170 128h66v192h118v64H170z" fill="currentColor" /><circle cx="350" cy="168" r="38" fill="#4D6CF0" /></svg>
+      <div className="flex size-10 items-center justify-center rounded-xl bg-[#2244CC] text-white">
+        <svg viewBox="0 0 240 240" className="size-6" aria-hidden="true"><path d="M101 70H170V138M170 70L70 170" fill="none" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </div>
-      <div className="leading-tight"><div className="font-semibold tracking-wide">LUMIO</div><div className="text-xs text-muted-foreground">Vertriebszentrale</div></div>
+      <div className="leading-tight"><div className="font-semibold tracking-[0.12em]">LUMIO GROUP</div><div className="text-xs text-muted-foreground">Vertriebszentrale</div></div>
     </div>
   )
 }
