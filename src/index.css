@@ -149,3 +149,7 @@
 .leaflet-control-attribution { font-size: 10px; }
 .dark .leaflet-control-attribution { background: rgb(10 15 28 / 0.75); color: #9aa3b5; }
 .dark .leaflet-control-attribution a { color: #c6cde0; }
+
+/* OpenStreetMap ruhiger und im dunklen Design invertiert */
+.leaflet-tile-pane { filter: saturate(0.45) brightness(1.04) contrast(0.92); }
+.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.85) contrast(0.9); }

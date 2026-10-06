@@ -86,8 +86,8 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
     m.createPane("pins").style.zIndex = "450"
     pins.current = L.layerGroup().addTo(m)
     if (KACHELN !== "aus") {
-      const t = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        subdomains: "abcd", maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
+      const t = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>-Mitwirkende',
       })
       let geladen = false
       t.on("tileload", () => { if (!geladen) { geladen = true; setzeKacheln("ok") } })
@@ -100,10 +100,6 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
     return () => { ro.disconnect(); m.remove(); map.current = null }
   }, [])
 
-  React.useEffect(() => {
-    const t = kachel.current; if (!t) return
-    t.setUrl(`https://{s}.basemaps.cartocdn.com/${dunkel ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`)
-  }, [dunkel])
 
   function zeichneNamen() {
     const m = map.current, g = namen.current; if (!m || !g) return
