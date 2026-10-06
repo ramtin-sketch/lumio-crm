@@ -151,5 +151,5 @@
 .dark .leaflet-control-attribution a { color: #c6cde0; }
 
 /* OpenStreetMap ruhiger und im dunklen Design invertiert */
-.leaflet-tile-pane { filter: saturate(0.45) brightness(1.04) contrast(0.92); }
-.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.85) contrast(0.9); }
+.leaflet-tile-pane { filter: grayscale(1) brightness(1.08) contrast(0.85); opacity: 0.85; }
+.dark .leaflet-tile-pane { filter: grayscale(1) invert(1) brightness(0.75) contrast(0.8); opacity: 0.9; }

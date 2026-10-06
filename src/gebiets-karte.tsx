@@ -70,6 +70,15 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
   const pins = React.useRef<L.LayerGroup | null>(null)
   const dunkel = useDunkel()
   const kacheln = useKacheln()
+  /* Straßen erst ab Straßen-Ebene (oder per Knopf), auf Stadt-Ebene die klare Ansicht mit Gebieten */
+  const [zoom, setZoom] = React.useState(0)
+  const [modus, setModus] = React.useState<"auto" | "an" | "aus">("auto")
+  const strassen = kacheln !== "aus" && (modus === "an" || (modus === "auto" && (klein || zoom >= 13)))
+  React.useEffect(() => {
+    const m = map.current, t = kachel.current; if (!m || !t) return
+    if (strassen && !m.hasLayer(t)) t.addTo(m)
+    if (!strassen && m.hasLayer(t)) m.removeLayer(t)
+  }, [strassen])
   const cb = React.useRef({ onUnit, onLead, onObjekt }); cb.current = { onUnit, onLead, onObjekt }
   const units = React.useMemo(() => K.UNITS.filter((u: any) => u.stadt === stadt), [stadt])
   const aktuell = React.useRef({ units, stadt, klein }); aktuell.current = { units, stadt, klein }
@@ -91,12 +100,12 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
       })
       let geladen = false
       t.on("tileload", () => { if (!geladen) { geladen = true; setzeKacheln("ok") } })
-      t.on("tileerror", () => { if (!geladen) { setzeKacheln("aus"); m.removeLayer(t); kachel.current = null } })
-      t.addTo(m); kachel.current = t
+      t.on("tileerror", () => { if (!geladen) { setzeKacheln("aus"); if (m.hasLayer(t)) m.removeLayer(t); kachel.current = null } })
+      kachel.current = t
     }
     const ro = new ResizeObserver(() => m.invalidateSize())
     ro.observe(box.current!)
-    m.on("zoomend", () => zeichneNamen())
+    m.on("zoomend", () => { zeichneNamen(); setZoom(m.getZoom()) })
     return () => { ro.disconnect(); m.remove(); map.current = null }
   }, [])
 
@@ -123,7 +132,7 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
   React.useEffect(() => {
     const m = map.current, g = flaechen.current; if (!m || !g) return
     const P = dunkel ? PALETTE.dunkel : PALETTE.hell
-    const ohneKarte = kacheln !== "ok"
+    const ohneKarte = !strassen || kacheln !== "ok"
     m.getContainer().style.background = ohneKarte ? P.bg : dunkel ? "#0e0e0e" : "#f2f2f0"
     g.clearLayers()
     if (ohneKarte) {
@@ -147,7 +156,7 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
       if (gewaehlt) poly.bringToFront()
     })
     zeichneNamen()
-  }, [units, auswahl, hervorheben, dunkel, kacheln, version, klein])
+  }, [units, auswahl, hervorheben, dunkel, kacheln, version, klein, strassen])
 
   React.useEffect(() => {
     const g = pins.current; if (!g) return
@@ -194,5 +203,15 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
     m.fitBounds(b, { padding: [16, 16] })
   }, [stadt, hervorheben, punkt?.lat, punkt?.lng, fokus?.lat, fokus?.lng, objekte ? objekte.length : -1])
 
-  return <div ref={box} className={cn("isolate z-0 overflow-hidden", className)} role="application" aria-label={"Karte " + (K.STAEDTE.find((s: any) => s.id === stadt)?.name ?? "")} />
+  return (
+    <div className={cn("relative isolate z-0 overflow-hidden", className)}>
+      <div ref={box} className="absolute inset-0" role="application" aria-label={"Karte " + (K.STAEDTE.find((s: any) => s.id === stadt)?.name ?? "")} />
+      {!klein && kacheln !== "aus" && (
+        <button type="button" onClick={() => setModus(strassen ? "aus" : "an")} aria-pressed={strassen}
+          className="absolute top-3 right-3 z-[1000] rounded-lg border bg-card/95 px-2.5 py-1.5 text-xs font-medium shadow-xs backdrop-blur hover:bg-muted">
+          {strassen ? "Straßen ausblenden" : "Straßen zeigen"}
+        </button>
+      )}
+    </div>
+  )
 }
