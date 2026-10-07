@@ -349,6 +349,7 @@ export async function anmelden(email: string, passwort: string) {
   const { data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: passwort })
   if (error) throw new Error(/invalid/i.test(error.message) ? "E-Mail oder Passwort stimmt nicht." : /banned/i.test(error.message) ? "Dieser Zugang ist gesperrt." : /rate|too many/i.test(error.message) ? "Zu viele Versuche. Bitte ein paar Minuten warten." : error.message)
   aktivitaetMerken()
+  try { sessionStorage.setItem("lumio-frisch", "1") } catch (e) {}   // gerade erst angemeldet: nicht gleich sperren
   return data.session
 }
 export async function abmelden() { await sb.auth.signOut() }

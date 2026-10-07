@@ -330,6 +330,7 @@ function Regeln() {
     ["Sperrliste", "„Will nie wieder angerufen werden“ beim Anruf oder hier von Hand. Gilt für alle und für spätere Importe."],
     ["Keine Gesprächsaufnahmen", "Anrufe werden nur als Ergebnis gezählt, nicht aufgenommen."],
     ["Zwei-Faktor-Anmeldung", "Neben dem Passwort ein Code vom Handy. Für die Geschäftsführung Pflicht, für andere einzeln einschaltbar. Die Datenbank selbst gibt ohne Code nichts heraus."],
+    ["App-Sperre auf dem Handy", "Sobald man die App verlässt, ist sie gesperrt. Entsperren mit Face ID/Fingerabdruck oder dem Code. Am Rechner nach 10 Minuten Abwesenheit."],
     ["Automatisch abmelden", `Nach ${ABMELDEN_NACH_STUNDEN} Stunden ohne Nutzung. Über das Menü unten links lässt sich jeder auf allen Geräten abmelden.`],
     ["Sicherungskopie jede Nacht", "Alle Daten werden nachts gesichert, die letzten 14 Tage bleiben vollständig."],
     ["Auffälligkeiten", "Anmeldungen nachts oder aus neuen Netzen, viele Änderungen auf einmal, Löschungen und Exporte werden gemeldet."],

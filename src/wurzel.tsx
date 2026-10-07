@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ECHT, sb, laden, anmelden, abmelden, offeneAenderungen, syncStatus, zweifaktorStand, zweifaktorPflicht, aktivitaetMerken, zuLangeWeg, ABMELDEN_NACH_STUNDEN, liveStarten, liveStoppen } from "@/daten/echt"
 import { ZweifaktorCode, ZweifaktorEinrichten } from "@/zweifaktor"
+import { AppSperre } from "@/app-sperre"
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner"
 import { neuZeichnen } from "@/store"
@@ -158,7 +159,7 @@ function Echt() {
     <Rahmen><Card><CardHeader><CardTitle className="text-xl">Willkommen, {M.person(ich).name}</CardTitle></CardHeader>
       <CardContent><PasswortFormular pflicht onFertig={() => sb.auth.refreshSession()} /></CardContent></Card></Rahmen>
   )
-  return <App start={ich} />
+  return <AppSperre ich={ich}><App start={ich} /></AppSperre>
 }
 
 export default function Wurzel() {
