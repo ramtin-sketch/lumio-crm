@@ -6,7 +6,9 @@ import { LeadZeile, kontext } from "@/lead-zeile"
 import { useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
 import { Button } from "@/components/ui/button"
-import { LocateFixed } from "lucide-react"
+import { CalendarClock, ListTodo, LocateFixed } from "lucide-react"
+import * as A from "@/model/akte.js"
+import { oeffneAkte } from "@/mandat-akte"
 
 function Leer({ titel, text }: { titel: string; text?: string }) {
   return <Empty className="py-8"><EmptyHeader><EmptyTitle className="text-sm">{titel}</EmptyTitle>{text && <EmptyDescription>{text}</EmptyDescription>}</EmptyHeader></Empty>
@@ -70,8 +72,31 @@ export function Heute() {
         </Card>
         {ui.istGF ? <UebergabenKarte /> : setter ? <GesetztKarte /> : <EingereichtKarte />}
       </div>
+      {ui.istGF && <MandatSchritteKarte />}
       {ui.istGF && <AussendienstKarte />}
     </>
+  )
+}
+
+function MandatSchritteKarte() {
+  const liste = A.offen().filter((t: any) => M.tageZwischen(M.HEUTE, t.datum) <= 7).slice(0, 8)
+  const name = (mid: string) => (M.MANDATE as any[]).find((m) => m.id === mid)?.name || "Mandat"
+  return (
+    <Card>
+      <CardHeader><CardTitle>Mandate: nächste Schritte</CardTitle><CardDescription>Termine und Aufgaben mit euren Partnern, die nächsten 7 Tage und Überfälliges</CardDescription></CardHeader>
+      <CardContent className="px-4">
+        {liste.length ? liste.map((t: any) => {
+          const rot = A.ueberfaellig(t)
+          return (
+            <button key={t.id} type="button" onClick={() => oeffneAkte(t.mandat)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted/60">
+              {t.art === "aufgabe" ? <ListTodo className="size-4 shrink-0 text-muted-foreground" /> : <CalendarClock className="size-4 shrink-0 text-muted-foreground" />}
+              <span className="min-w-0 flex-1"><span className="block truncate font-medium">{t.titel}</span><span className="block truncate text-xs text-muted-foreground">{name(t.mandat)}{t.ort ? " · " + t.ort : ""}</span></span>
+              <span className={"shrink-0 font-mono text-xs tabular " + (rot ? "text-destructive" : "text-muted-foreground")}>{t.datum === M.HEUTE ? "Heute" + (t.zeit ? " " + t.zeit : "") : A.zeitText(t)}</span>
+            </button>
+          )
+        }) : <Leer titel="Bei den Mandaten ist nichts fällig" text="Neue Schritte legst du in der Akte eines Mandats an." />}
+      </CardContent>
+    </Card>
   )
 }
 

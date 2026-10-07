@@ -6,7 +6,9 @@ import { Seitenkopf } from "@/bits"
 import { useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
 import * as React from "react"
-import { ArrowRight, Mail, Pencil, Phone, Plus } from "lucide-react"
+import { ArrowRight, CalendarClock, FolderOpen, Mail, Pencil, Phone, Plus } from "lucide-react"
+import { oeffneAkte, STATUS_TEXT } from "@/mandat-akte"
+import * as A from "@/model/akte.js"
 import { MandatSheet } from "@/mandat-sheet"
 import * as D from "@/model/d2d.js"
 
@@ -38,7 +40,7 @@ export function Mandate() {
                     <CardDescription>{m.produkt}{m.seit ? " · seit " + M.dKurz(m.seit) + m.seit.slice(0, 4) : ""}</CardDescription>
                     <CardAction className="flex items-center gap-1">{m.status === "aktiv"
                       ? <Badge variant="outline" className="border-transparent bg-ok/15 text-ok">aktiv</Badge>
-                      : <Badge variant="outline" className="border-transparent bg-warn/15 text-warn">{({ verhandlung: "in Verhandlung", pausiert: "pausiert", beendet: "beendet" } as any)[m.status] || m.status}</Badge>}
+                      : <Badge variant="outline" className="border-transparent bg-warn/15 text-warn">{STATUS_TEXT[m.status] || m.status}</Badge>}
                       {ui.istGF && <Button variant="ghost" size="icon" className="size-7" aria-label={m.name + " bearbeiten"} onClick={() => setBearbeiten({ m })}><Pencil /></Button>}</CardAction>
                   </CardHeader>
                   <CardContent className="space-y-4 text-sm">
@@ -49,18 +51,35 @@ export function Mandate() {
                     </div>
                     <div><div className="mb-0.5 text-xs font-medium text-muted-foreground">Konditionen</div>{m.ktext || "Noch nicht eingetragen."}{m.hv ? ` Handelsvertreter erhalten ${m.hv} %.` : ""}</div>
                     <Separator />
-                    <div>
-                      <div className="mb-0.5 text-xs font-medium text-muted-foreground">Ansprechpartner</div>
-                      <div className="font-medium">{m.ap?.name || "—"}</div>{m.ap?.funktion && <div className="text-muted-foreground">{m.ap.funktion}</div>}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {m.ap?.tel && <Button asChild variant="outline" size="xs"><a href={"tel:" + m.ap.tel.replace(/\s/g, "")}><Phone />{m.ap.tel}</a></Button>}
-                        {m.ap?.mail && <Button asChild variant="outline" size="xs"><a href={"mailto:" + m.ap.mail}><Mail />E-Mail</a></Button>}
-                      </div>
-                    </div>
+                    {(() => {
+                      const hk: any = A.hauptkontakt(m.id) || m.ap, mehr = A.kontakteVon(m.id).length - 1, n: any = A.naechster(m.id)
+                      return (
+                        <>
+                          {ui.istGF && (
+                            <button type="button" className="flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left hover:bg-muted/50" onClick={() => oeffneAkte(m.id)}>
+                              <CalendarClock className={"mt-0.5 size-4 shrink-0 " + (n && A.ueberfaellig(n) ? "text-destructive" : "text-muted-foreground")} />
+                              <span className="min-w-0"><span className="block text-xs font-medium text-muted-foreground">Nächster Schritt</span>
+                                {n ? <span className={A.ueberfaellig(n) ? "text-destructive" : ""}>{A.zeitText(n)} · {n.titel}</span> : <span className="text-muted-foreground">Nichts geplant</span>}</span>
+                            </button>
+                          )}
+                          <div>
+                            <div className="mb-0.5 text-xs font-medium text-muted-foreground">Ansprechpartner{mehr > 0 ? ` (+${mehr} weitere)` : ""}</div>
+                            <div className="font-medium">{hk?.name || "—"}</div>{hk?.funktion && <div className="text-muted-foreground">{hk.funktion}</div>}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {hk?.tel && <Button asChild variant="outline" size="xs"><a href={"tel:" + hk.tel.replace(/\s/g, "")}><Phone />{hk.tel}</a></Button>}
+                              {hk?.mail && <Button asChild variant="outline" size="xs"><a href={"mailto:" + hk.mail}><Mail />E-Mail</a></Button>}
+                            </div>
+                          </div>
+                        </>
+                      )
+                    })()}
                     <div className="flex flex-wrap gap-1">{m.felder.map((f: any) => <Badge key={f.key} variant="secondary" className="font-normal">{f.label}</Badge>)}</div>
                   </CardContent>
-                  {m.status === "aktiv" && (
-                    <CardFooter className="mt-auto"><Button variant="ghost" size="sm" className="-ml-2" onClick={() => ui.geheZu(m.bereich === "d2d" ? "d2d" : m.bereich, { mandat: m.id })}>Leads ansehen<ArrowRight /></Button></CardFooter>
+                  {(ui.istGF || m.status === "aktiv") && (
+                    <CardFooter className="mt-auto flex flex-wrap gap-2">
+                      {ui.istGF && <Button variant="outline" size="sm" onClick={() => oeffneAkte(m.id)}><FolderOpen />Akte</Button>}
+                      {m.status === "aktiv" && <Button variant="ghost" size="sm" onClick={() => ui.geheZu(m.bereich === "d2d" ? "d2d" : m.bereich, { mandat: m.id })}>Leads ansehen<ArrowRight /></Button>}
+                    </CardFooter>
                   )}
                 </Card>
               )

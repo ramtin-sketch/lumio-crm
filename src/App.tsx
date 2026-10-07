@@ -1,3 +1,4 @@
+import { MandatAkte } from "@/mandat-akte"
 import * as React from "react"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -105,6 +106,7 @@ export default function App({ start }: { start?: string }) {
           <NeuSheet />
           <ErfassenSheet />
           <Suche />
+          <MandatAkte />
           <Toaster position="bottom-center" />
         </SidebarProvider>
       </TooltipProvider>

@@ -5,6 +5,7 @@ import { createClient, type Session } from "@supabase/supabase-js"
 import * as M from "@/model/model.js"
 import * as K from "@/model/karte.js"
 import * as D from "@/model/d2d.js"
+import * as A from "@/model/akte.js"
 
 export const SUPABASE_URL = "https://ehgjsvpbzgmlcgingkel.supabase.co"
 export const SUPABASE_KEY = "sb_publishable_GVNRUlS24_FvyG_PpsfRSw_GqpQQiaj" // öffentlicher Schlüssel, Rechte regelt die Datenbank
@@ -46,7 +47,7 @@ const anders = (schluessel: string, zeile: any) => gespeichert.get(schluessel) !
 
 export async function laden(session: Session) {
   const seit = M.ymAdd(M.MONAT, -6) + "-01"
-  const [profile, mandate, leads, termine, anrufe, gebiete, sperren, objekte, auftraege, besuche, privat] = await Promise.all([
+  const [profile, mandate, leads, termine, anrufe, gebiete, sperren, objekte, auftraege, besuche, akteKontakte, akteNotizen, akteTermine, privat] = await Promise.all([
     alle("profil", "id, name, rolle, aktiv, erstellt_am, kurz, farbe, stadt, gebiet"),
     alle("mandat", "*", (q) => q.order("id")),
     alle("lead", "*, kontakt(*), verlauf(*), abschluss(*)"),
@@ -57,6 +58,9 @@ export async function laden(session: Session) {
     alle("objekt", "*, wohnung(*)"),
     alle("auftrag"),
     alle("besuch", "*", (q) => q.gte("zeit", seit)),
+    alle("mandat_kontakt"),
+    alle("mandat_notiz", "*", (q) => q.order("erstellt_am", { ascending: false })),
+    alle("mandat_termin"),
     // E-Mail, Telefon, Provision und D2D-Ausweis: nur eigene, die Geschäftsführung sieht alle
     sb.rpc("profil_privat").then(({ data, error }: any) => { if (error) throw new Error("profil: " + error.message); return data || [] }),
   ])
@@ -94,6 +98,8 @@ export async function laden(session: Session) {
     auftraege: auftraege.map(auftragAus),
     besuche: besuche.map(besuchAus),
   })
+
+  A.datenErsetzen({ kontakte: akteKontakte.map(akteKontaktAus), notizen: akteNotizen.map(akteNotizAus), termine: akteTermine.map(akteTerminAus) })
 
   // Stand merken, damit nur echte Änderungen gespeichert werden
   M.LEADS.forEach((l: any) => {
@@ -146,6 +152,9 @@ const objektAus = (o: any) => ({
 const auftragAus = (a: any) => ({ id: a.id, objekt: a.objekt_id, wohnung: a.wohnung_id, mandat: String(a.mandat_id), wer: a.vertriebler_id, datum: a.datum, produkt: a.produkt,
   kunde: { name: a.kunde_name || "", tel: a.kunde_tel || "", mail: a.kunde_mail || "" }, felder: a.felder || {}, status: a.status, statusDatum: a.status_datum,
   partnerNr: a.partner_nr, provision: a.provision == null ? null : Number(a.provision), ausgezahlt: a.ausgezahlt, notiz: a.notiz })
+const akteKontaktAus = (k: any) => ({ id: k.id, mandat: String(k.mandat_id), name: k.name, funktion: k.funktion || "", tel: k.telefon || "", mail: k.email || "", notiz: k.notiz || "", haupt: !!k.hauptkontakt, aktiv: k.aktiv !== false })
+const akteNotizAus = (n: any) => ({ id: n.id, mandat: String(n.mandat_id), wer: n.profil_id, datum: n.datum, titel: n.titel || "", text: n.text || "", zeit: n.erstellt_am })
+const akteTerminAus = (t: any) => ({ id: t.id, mandat: String(t.mandat_id), art: t.art, titel: t.titel, datum: t.datum, zeit: t.zeit ? String(t.zeit).slice(0, 5) : null, ort: t.ort || "", notiz: t.notiz || "", erledigt: !!t.erledigt, wer: t.wer })
 const besuchAus = (b: any) => ({ id: b.id, wohnung: b.wohnung_id, objekt: b.objekt_id, wer: b.profil_id, zeit: b.zeit, ergebnis: b.ergebnis })
 
 /* ---------- Abbildung App → Datenbank ---------- */
@@ -489,7 +498,7 @@ export async function exportMelden(art: string, anzahl: number) {
    Supabase schickt jede Änderung an alle offenen Geräte, aber nur an die, die den Datensatz sehen dürfen.
    Eigene Änderungen werden übersprungen (sind schon da). Leads und Häuser werden komplett frisch geholt,
    damit Ansprechpartner, Verlauf und Wohnungen stimmen. */
-const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat"]
+const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat", "mandat_kontakt", "mandat_notiz", "mandat_termin"]
 let kanal: any = null, liveIch = "", liveZeichnen: () => void = () => {}, liveTimer: any = null, warGetrennt = false, nachladenTimer: any = null
 let liveZustand: "aus" | "verbinde" | "live" | "getrennt" = "aus"
 export const liveStand = () => liveZustand
@@ -619,6 +628,11 @@ async function verarbeiten() {
       if (i >= 0) Object.assign(D.AUFTRAEGE[i], x); else (D.AUFTRAEGE as any[]).push(x)
       merke("auftrag:" + x.id, auftragZeile(x))
       hinweis("auftrag", x.id, wer || "")
+    } else if (t === "mandat_kontakt" || t === "mandat_termin" || t === "mandat_notiz") {
+      const [liste, aus] = t === "mandat_kontakt" ? [A.KONTAKTE, akteKontaktAus] : t === "mandat_termin" ? [A.TERMINE, akteTerminAus] : [A.NOTIZEN, akteNotizAus]
+      const x: any = (aus as any)(r), i = (liste as any[]).findIndex((y: any) => y.id === x.id)
+      if (i >= 0) Object.assign((liste as any[])[i], x); else (liste as any[]).push(x)
+      hinweis("mandat", x.mandat, wer || "")
     } else continue
     geaendert = true
   }
@@ -639,4 +653,22 @@ export async function claudeEinrichten() {
 export async function claudeSperren() {
   const { error } = await sb.rpc("claude_schluessel_sperren")
   if (error) throw new Error(uebersetzen(error.message))
+}
+
+/* ---------- Mandats-Akte speichern (sofort, nur Geschäftsführung) ---------- */
+const mid = (m: string) => Number((M.MANDATE as any[]).find((x) => x.id === m)?.dbId ?? m)
+export async function akteKontaktSpeichern(k: any) {
+  const zeile = { id: k.id, mandat_id: mid(k.mandat), name: k.name, funktion: k.funktion || null, telefon: k.tel || null, email: k.mail || null, notiz: k.notiz || null, hauptkontakt: !!k.haupt, aktiv: k.aktiv !== false }
+  if (ECHT) { const { error } = await sb.from("mandat_kontakt").upsert(zeile); if (error) throw new Error(uebersetzen(error.message)) }
+  const i = A.KONTAKTE.findIndex((x: any) => x.id === k.id); if (i >= 0) Object.assign(A.KONTAKTE[i], k); else (A.KONTAKTE as any[]).push(k)
+}
+export async function akteNotizHinzu(n: any) {
+  const zeile = { id: n.id, mandat_id: mid(n.mandat), titel: n.titel || null, text: n.text || null }
+  if (ECHT) { const { error } = await sb.from("mandat_notiz").insert(zeile); if (error) throw new Error(uebersetzen(error.message)) }
+  ;(A.NOTIZEN as any[]).push({ ...n, zeit: new Date().toISOString(), datum: M.HEUTE })
+}
+export async function akteTerminSpeichern(t: any) {
+  const zeile = { id: t.id, mandat_id: mid(t.mandat), art: t.art, titel: t.titel, datum: t.datum, zeit: t.zeit || null, ort: t.ort || null, notiz: t.notiz || null, erledigt: !!t.erledigt, wer: t.wer || null }
+  if (ECHT) { const { error } = await sb.from("mandat_termin").upsert(zeile); if (error) throw new Error(uebersetzen(error.message)) }
+  const i = A.TERMINE.findIndex((x: any) => x.id === t.id); if (i >= 0) Object.assign(A.TERMINE[i], t); else (A.TERMINE as any[]).push(t)
 }

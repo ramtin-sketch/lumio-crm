@@ -79,7 +79,7 @@ function Formular({ m, onClose }: { m: any | null; onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <Feld id="mb" label="Bereich"><NativeSelect id="mb" value={w.bereich} onChange={(e) => set("bereich", e.target.value)}>{M.BEREICHE.map((b: any) => <NativeSelectOption key={b.id} value={b.id}>{b.name}</NativeSelectOption>)}</NativeSelect></Feld>
           <Feld id="ms" label="Status"><NativeSelect id="ms" value={w.status} onChange={(e) => set("status", e.target.value)}>
-            {[["aktiv", "aktiv"], ["verhandlung", "in Verhandlung"], ["pausiert", "pausiert"], ["beendet", "beendet"]].map(([v, t]) => <NativeSelectOption key={v} value={v}>{t}</NativeSelectOption>)}
+            {[["anbahnung", "Anbahnung"], ["verhandlung", "in Verhandlung"], ["aktiv", "aktiv"], ["pausiert", "pausiert"], ["beendet", "beendet"]].map(([v, t]) => <NativeSelectOption key={v} value={v}>{t}</NativeSelectOption>)}
           </NativeSelect></Feld>
         </div>
         <div className="grid grid-cols-2 gap-3">
