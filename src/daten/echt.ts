@@ -141,7 +141,7 @@ function leadAus(r: any) {
     abschluss: ab ? { datum: ab.datum, status: ab.status, laufzeit: num(ab.laufzeit), monatsbeitrag: num(ab.monatsbeitrag), volumen: num(ab.volumen), teilnehmer: num(ab.teilnehmer), dealgroesse: num(ab.dealgroesse) } : null,
   }
 }
-const terminAus = (t: any) => ({ id: t.id, lead: t.lead_id, setter: t.setter_id, closer: t.closer_id, datum: t.datum, zeit: t.zeit, status: t.status, ergebnis: t.ergebnis })
+const terminAus = (t: any) => ({ id: t.id, lead: t.lead_id, setter: t.setter_id, closer: t.closer_id, datum: t.datum, zeit: t.zeit, status: t.status, ergebnis: t.ergebnis, googleEvent: t.google_event_id || null, googleLink: t.google_link || null })
 const sperreAus = (e: any) => ({ id: e.id, telefon: e.telefon, email: e.email, firma: e.firma, grund: e.grund, lead: e.lead_id, datum: (e.erstellt_am || "").slice(0, 10), wer: e.erstellt_von })
 const objektAus = (o: any) => ({
   id: o.id, mandat: String(o.mandat_id), strasse: o.strasse, hausnr: o.hausnr || "", plz: o.plz || "", ort: o.ort || "", stadt: o.stadt, unit: o.unit,
@@ -172,7 +172,7 @@ const abschlussZeile = (l: any) => {
   const a = l.abschluss
   return { lead_id: l.id, datum: a.datum, status: a.status, laufzeit: a.laufzeit ?? null, monatsbeitrag: a.monatsbeitrag ?? null, volumen: a.volumen ?? null, teilnehmer: a.teilnehmer ?? null, dealgroesse: a.dealgroesse ?? null }
 }
-const terminZeile = (t: any) => ({ id: t.id, lead_id: t.lead || null, setter_id: t.setter || null, closer_id: t.closer || null, datum: t.datum, zeit: t.zeit || null, status: t.status, ergebnis: t.ergebnis || "offen" })
+const terminZeile = (t: any) => ({ id: t.id, lead_id: t.lead || null, setter_id: t.setter || null, closer_id: t.closer || null, datum: t.datum, zeit: t.zeit || null, status: t.status, ergebnis: t.ergebnis || "offen", google_event_id: t.googleEvent || null, google_link: t.googleLink || null })
 
 const objektZeile = (o: any) => ({ id: o.id, mandat_id: Number(o.mandat) || null, strasse: o.strasse, hausnr: o.hausnr || null, plz: o.plz || null, ort: o.ort || null,
   stadt: o.stadt || null, unit: o.unit || null, lat: o.geo?.lat ?? null, lng: o.geo?.lng ?? null, typ: o.typ || "mfh", betreuer_id: o.betreuer || null, gesperrt: !!o.gesperrt, notiz: o.notiz || null })

@@ -28,11 +28,12 @@ import { Cloud, CloudOff, Loader2, LocateFixed, Plus, Search } from "lucide-reac
 import { aufStatus, syncStatus, liveStand } from "@/daten/echt"
 import { Datenschutz } from "@/views/datenschutz"
 import { ImportExport } from "@/views/import"
+import { Kalender } from "@/views/kalender"
 
 const TITEL: Record<string, string> = {
   heute: "Heute", dashboard: "Dashboard", werbung: "Werbemandate", bildung: "Weiterbildung", standort: "Standortakquise", karte: "Karte",
   anrufen: "Anrufen", mandate: "Mandate", team: "Team & Provisionen", verdienst: "Mein Verdienst",
-  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sicherheit", d2d: "Door-to-Door", import: "Import & Export",
+  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sicherheit", d2d: "Door-to-Door", import: "Import & Export", kalender: "Kalender",
 }
 
 function SyncAnzeige() {
@@ -87,6 +88,7 @@ function Inhalt() {
     case "karte": return <Karte />
     case "d2d": return <D2D />
     case "datenschutz": return <Datenschutz />
+    case "kalender": return <Kalender />
     case "import": return <ImportExport />
   }
   return null

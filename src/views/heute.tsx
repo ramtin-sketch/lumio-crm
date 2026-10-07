@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { CalendarClock, ListTodo, LocateFixed } from "lucide-react"
 import * as A from "@/model/akte.js"
 import { oeffneAkte } from "@/mandat-akte"
+import { KalenderHeuteKarte } from "@/views/kalender"
 
 function Leer({ titel, text }: { titel: string; text?: string }) {
   return <Empty className="py-8"><EmptyHeader><EmptyTitle className="text-sm">{titel}</EmptyTitle>{text && <EmptyDescription>{text}</EmptyDescription>}</EmptyHeader></Empty>
@@ -72,7 +73,7 @@ export function Heute() {
         </Card>
         {ui.istGF ? <UebergabenKarte /> : setter ? <GesetztKarte /> : <EingereichtKarte />}
       </div>
-      {ui.istGF && <MandatSchritteKarte />}
+      {ui.istGF && <div className="grid gap-4 lg:grid-cols-2"><KalenderHeuteKarte /><MandatSchritteKarte /></div>}
       {ui.istGF && <AussendienstKarte />}
     </>
   )

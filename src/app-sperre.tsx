@@ -15,7 +15,7 @@ const MOBIL = typeof window !== "undefined" && (
   /iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
 const DESKTOP_NACH_MS = 10 * 60000
 let ausnahmeBis = 0
-const sperreKurzAussetzen = (ms = 5 * 60000) => { ausnahmeBis = Date.now() + ms }
+export const sperreKurzAussetzen = (ms = 5 * 60000) => { ausnahmeBis = Date.now() + ms }
 
 /* ---------- Face ID / Fingerabdruck über Passkey (nur auf diesem Gerät) ---------- */
 const schluessel = (ich: string) => "lumio-entsperren-" + ich

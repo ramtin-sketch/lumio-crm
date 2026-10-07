@@ -17,7 +17,7 @@ import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -52,6 +52,7 @@ export function AppSidebar() {
         { label: "Übersicht", punkte: [
           { id: "heute", titel: "Heute", icon: CalendarCheck, zahl: faelligHeute },
           { id: "dashboard", titel: "Dashboard", icon: LayoutDashboard },
+          { id: "kalender", titel: "Kalender", icon: CalendarDays },
         ] },
         { label: "Vertrieb", punkte: [
           { id: "werbung", titel: "Werbemandate", icon: Megaphone },
@@ -74,6 +75,7 @@ export function AppSidebar() {
           { id: "heute", titel: "Heute", icon: CalendarCheck, zahl: faelligHeute },
           { id: "anrufen", titel: "Anrufen", icon: Phone, zahl: anrufListe },
           { id: "termine", titel: "Meine Termine", icon: ArrowRightLeft, zahl: neuTerminieren },
+          { id: "kalender", titel: "Kalender", icon: CalendarDays },
         ] },
       ]
     : [
@@ -82,6 +84,7 @@ export function AppSidebar() {
           { id: "karte", titel: "Mein Gebiet", icon: MapIcon },
           { id: "standort", titel: "Meine Standorte", icon: MapPin },
           ...(ich.d2d?.freigaben?.length || D.OBJEKTE.some((o: any) => o.betreuer === ui.ich) ? [{ id: "d2d" as Ansicht, titel: "Door-to-Door", icon: DoorOpen }] : []),
+          { id: "kalender", titel: "Kalender", icon: CalendarDays },
           { id: "verdienst", titel: "Mein Verdienst", icon: Wallet },
         ] },
       ]
