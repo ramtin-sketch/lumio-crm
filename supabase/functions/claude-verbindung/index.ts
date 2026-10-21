@@ -37,7 +37,8 @@ function alsClaude<T>(f: (tx: any) => Promise<T>): Promise<T> {
 
 /* ---------- Hilfen ---------- */
 const STUFEN: Record<string, string[]> = {
-  werbung: ["recherche", "setting", "termin", "closing", "verloren"],
+  // Werbemandate: recherche = Neu, anrufversuch = noch niemanden erreicht, setting = Entscheider erreicht, spaeter = später wieder
+  werbung: ["recherche", "anrufversuch", "setting", "termin", "folgetermin", "closing", "verloren", "spaeter"],
   bildung: ["recherche", "setting", "termin", "closing", "verloren"],
   standort: ["recherche", "eigentuemer", "besichtigung", "eingereicht", "verloren"],
 };
@@ -108,7 +109,7 @@ const WERKZEUGE: Werkzeug[] = [
     inputSchema: { type: "object", properties: {
       suche: { type: "string", description: "Firmenname, Ort, Ansprechpartner oder Telefonnummer" },
       bereich: { type: "string", enum: ["werbung", "bildung", "standort"] },
-      phase: { type: "string", description: "z. B. recherche, setting, termin, closing, gewonnen, verloren, eigentuemer, besichtigung, eingereicht" },
+      phase: { type: "string", description: "Werbemandate: recherche (Neu), anrufversuch, setting (Erreicht), termin, folgetermin, closing, gewonnen, verloren, spaeter (Später wieder). Weiterbildung: recherche, setting, termin, closing, gewonnen, verloren. Standort: recherche, eigentuemer, besichtigung, eingereicht, gewonnen, verloren" },
       betreut_von: { type: "string", description: "Name der Person" },
       mandat: { type: "string", description: "Name oder ID des Mandats" },
       ohne_naechsten_schritt: { type: "boolean", description: "Nur offene Leads ohne geplanten nächsten Schritt" },

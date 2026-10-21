@@ -12,7 +12,7 @@ import { bump, useUI } from "@/store"
 import { cn } from "@/lib/utils"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
-import { ArrowRight, CalendarCheck2, CalendarDays, CalendarX2, Loader2, UserCheck } from "lucide-react"
+import { ArrowRight, CalendarCheck2, CalendarDays, CalendarPlus, CalendarX2, FileText, Loader2, UserCheck } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { belegtAm, freieZeiten, terminEintragen } from "@/daten/kalender"
 
@@ -170,21 +170,23 @@ export function UebergabeFormular({ l, onFertig, onAbbrechen }: { l: any; onFert
 /* Karte im Lead: was der Setter mitgibt, und nach dem Termin die zwei Knöpfe für den Closer */
 export function UebergabeKarte({ l }: { l: any }) {
   const ui = useUI()
+  const [folge, setFolge] = React.useState(false)
   const u = l.uebergabe
   if (!u) return null
   const budget = M.BUDGETS.find((b: any) => b[0] === u.budget)?.[1]
   const ent = M.ENTSCHEIDER.find((b: any) => b[0] === u.entscheider)?.[1]
-  const darfErgebnis = l.stufe === "termin" && (ui.ich === u.an || ui.istGF)
+  const darfErgebnis = (l.stufe === "termin" || l.stufe === "folgetermin") && (ui.ich === (l.closer || u.an) || ui.istGF)
+  const neu = M.istNeuesModell(l)
   const faellig = u.termin.datum <= M.HEUTE
   const selbst = u.von === u.an
   return (
-    <Card className={cn("gap-3 py-4", l.stufe === "termin" && "border-cobalt/40 bg-cobalt/[0.03]")}>
+    <Card className={cn("gap-3 py-4", (l.stufe === "termin" || l.stufe === "folgetermin") && "border-cobalt/40 bg-cobalt/[0.03]")}>
       <CardHeader className="px-4">
         <CardTitle className="flex items-center gap-2 text-sm">
           <PersonAvatar id={u.von} />{!selbst && <><ArrowRight className="size-3.5 text-muted-foreground" /><PersonAvatar id={u.an} /></>}
           <span>{selbst ? "Selbst gesetzt von " + M.person(u.von).name : "Übergabe von " + M.person(u.von).name + " an " + M.person(u.an).name}</span>
         </CardTitle>
-        <CardDescription>Termin {M.dKurz(u.termin.datum)}{u.termin.zeit ? " um " + u.termin.zeit : ""} · gesetzt am {M.dKurz(u.datum)}</CardDescription>
+        <CardDescription>Termin {M.dKurz(u.termin.datum)}{u.termin.zeit ? " um " + u.termin.zeit : ""} · gesetzt am {M.dKurz(u.datum)}{l.stufe === "folgetermin" && l.next ? " · Folgetermin " + M.wann(l.next) : ""}</CardDescription>
         {l.terminStatus === "noshow" && <CardAction><Badge variant="outline" className="border-transparent bg-destructive/10 text-destructive">No-Show</Badge></CardAction>}
         {l.terminStatus === "gelaufen" && <CardAction><Badge variant="outline" className="border-transparent bg-ok/15 text-ok">gelaufen</Badge></CardAction>}
       </CardHeader>
@@ -199,13 +201,66 @@ export function UebergabeKarte({ l }: { l: any }) {
         {darfErgebnis && (
           <div className="space-y-2">
             {!faellig && <p className="text-xs text-muted-foreground">Nach dem Termin hier eintragen, wie er gelaufen ist.</p>}
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "gelaufen")); bump() }}><CalendarCheck2 />Termin gelaufen</Button>
-              <Button size="sm" variant="outline" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "noshow")); bump() }}><CalendarX2 />Nicht erschienen</Button>
-            </div>
+            {neu ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <Button size="sm" variant={folge ? "secondary" : "default"} onClick={() => setFolge(!folge)}><CalendarPlus />Folgetermin</Button>
+                <Button size="sm" variant="outline" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "angebot")); bump() }}><FileText />Angebot raus</Button>
+                <Button size="sm" variant="outline" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "noshow")); bump() }}><CalendarX2 />Nicht erschienen</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "gelaufen")); bump() }}><CalendarCheck2 />Termin gelaufen</Button>
+                <Button size="sm" variant="outline" onClick={() => { toast(M.terminErgebnis(l, ui.ich, "noshow")); bump() }}><CalendarX2 />Nicht erschienen</Button>
+              </div>
+            )}
+            {neu && folge && <FolgeterminFormular l={l} onFertig={() => setFolge(false)} />}
+            {neu && <p className="text-xs text-muted-foreground">Abschluss oder kein Interesse trägst du weiter unten im Lead ein.</p>}
           </div>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/* Folgetermin nach dem Ersttermin, auf Wunsch gleich in den Google-Kalender des Closers */
+function FolgeterminFormular({ l, onFertig }: { l: any; onFertig: () => void }) {
+  const ui = useUI()
+  const closer = l.closer || ui.ich
+  const [datum, setDatum] = React.useState(M.tag(7))
+  const [zeit, setZeit] = React.useState("10:00")
+  const [kalender, setKalender] = React.useState(ui.echt)
+  const [meet, setMeet] = React.useState(false)
+  const [laeuft, setLaeuft] = React.useState(false)
+  const k = (l.kontakte || [])[0] || {}
+  async function absenden(e: React.FormEvent) {
+    e.preventDefault(); setLaeuft(true)
+    try {
+      toast(M.terminErgebnis(l, ui.ich, "folgetermin", { datum, zeit }))
+      const t = [...M.TERMINE].reverse().find((x: any) => x.lead === l.id && x.datum === datum && x.status === "geplant")
+      if (kalender && ui.echt) {
+        try {
+          const r = await terminEintragen({ closer, datum, zeit, dauer: 30, meet, einladen: false, titel: `Folgetermin: ${l.name}`, termin_id: t?.id ? String(t.id) : undefined,
+            beschreibung: [`Folgetermin, eingetragen über die LUMIO-Vertriebszentrale`, ``, `Firma: ${l.name}`, k.name ? `Ansprechpartner: ${k.name}` : null, k.tel ? `Telefon: ${k.tel}` : null].filter((z) => z !== null).join("\n") })
+          if (t) { t.googleEvent = r.id; t.googleLink = r.link }
+          toast(`Im Kalender von ${M.person(closer).name} eingetragen.`)
+        } catch (x: any) { toast(`Folgetermin ist im CRM, aber nicht im Kalender: ${x.message}`) }
+      }
+      bump(); onFertig()
+    } finally { setLaeuft(false) }
+  }
+  return (
+    <form className="space-y-2 rounded-lg border border-dashed p-3" onSubmit={absenden}>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid gap-1"><Label htmlFor={"fd" + l.id} className="text-xs text-muted-foreground">Datum</Label><Input id={"fd" + l.id} type="date" value={datum} onChange={(e) => setDatum(e.target.value)} required className="h-8 w-40" /></div>
+        <div className="grid gap-1"><Label htmlFor={"fz" + l.id} className="text-xs text-muted-foreground">Uhrzeit</Label><Input id={"fz" + l.id} type="time" value={zeit} onChange={(e) => setZeit(e.target.value)} required className="h-8 w-28" /></div>
+        <Button type="submit" size="sm" disabled={laeuft}>{laeuft ? <Loader2 className="animate-spin" /> : <CalendarPlus />}Eintragen</Button>
+      </div>
+      {ui.echt && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <label className="flex items-center gap-1.5"><Checkbox checked={kalender} onCheckedChange={(v) => setKalender(!!v)} />In Google-Kalender von {M.person(closer).name}</label>
+          {kalender && <label className="flex items-center gap-1.5"><Checkbox checked={meet} onCheckedChange={(v) => setMeet(!!v)} />Mit Meet-Link</label>}
+        </div>
+      )}
+    </form>
   )
 }

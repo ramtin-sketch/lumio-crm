@@ -164,7 +164,7 @@ function Inhalt({ l }: { l: any }) {
           </div>
         )}
 
-        {M.istOffen(l) && (
+        {(M.istOffen(l) || l.stufe === "spaeter") && (
           <>
             {!(sperre && tel) && <Abschnitt titel={(tel ? "Anruf" : "Besuch") + " protokollieren"}><Ergebnis l={l} /></Abschnitt>}
             <Abschnitt titel="Nächster Schritt">

@@ -41,7 +41,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
   if (gf && bereich !== "standort" && nurMeine) ls = ls.filter((l: any) => l.betreuer === ui.ich || l.setter === ui.ich || l.closer === ui.ich)
   if (q) { const s = q.toLowerCase(); ls = ls.filter((l: any) => (l.name + " " + (l.ort || "") + " " + l.kontakte.map((k: any) => k.name).join(" ")).toLowerCase().includes(s)) }
   const stufen = M.STUFEN[bereich].filter((s: any) => !s.ende)
-  const won = ls.filter((l: any) => l.stufe === "gewonnen"), lost = ls.filter((l: any) => l.stufe === "verloren")
+  const won = ls.filter((l: any) => l.stufe === "gewonnen"), lost = ls.filter((l: any) => l.stufe === "verloren"), spaeter = ls.filter((l: any) => l.stufe === "spaeter")
   const wonM = won.filter((l: any) => l.abschluss && M.ym(l.abschluss.datum) === M.MONAT).length
 
   const ablegen = (stufe: string) => {
@@ -101,7 +101,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
               </TabsList>
             </Tabs>
           )}
-          <div className={cn("grid gap-3", mobil ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-4")}>
+          <div className={cn("grid gap-3", mobil ? "grid-cols-1" : stufen.length > 4 ? "grid-cols-3 2xl:grid-cols-6" : "grid-cols-2 xl:grid-cols-4")}>
             {stufen.filter((s: any) => !mobil || s.id === mobilStufe).map((s: any) => {
               const inS = ls.filter((l: any) => l.stufe === s.id).sort(sortOffen)
               return (
@@ -125,6 +125,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>{bereich === "werbung" ? "Abgeschlossen" : bereich === "bildung" ? "Angemeldet" : "Freigegeben"}: {won.length} <span className="text-muted-foreground">({wonM} im {M.MONATSNAMEN[M.T0.getMonth()]})</span></Button>
             <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>{bereich !== "standort" ? "Verloren" : "Abgelehnt"}: {lost.length}</Button>
+            {bereich === "werbung" && <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>Später wieder: {spaeter.length}</Button>}
             {!mobil && <span className="ml-auto text-xs">Tipp: Karten mit der Maus in eine andere Spalte ziehen</span>}
           </div>
         </>

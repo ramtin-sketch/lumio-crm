@@ -84,7 +84,7 @@ export async function laden(session: Session) {
     const d = a.zeit.slice(0, 10), key = a.profil_id + d
     if (!tage.has(key)) tage.set(key, { person: a.profil_id, datum: d, wahl: 0, erreicht: 0, termine: 0, einwaende: {} })
     const t = tage.get(key); t.wahl++
-    if (a.ergebnis !== "nicht") t.erreicht++
+    if (!M.NICHT_ERREICHT.includes(a.ergebnis)) t.erreicht++
     if (a.ergebnis === "termin") t.termine++
     if (a.einwand) t.einwaende[a.einwand] = (t.einwaende[a.einwand] || 0) + 1
   })
@@ -132,7 +132,7 @@ function leadAus(r: any) {
     geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
     stufe: r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
     next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
-    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0,
+    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0, versuche: r.versuche || 0,
     uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,
     kontakte: (r.kontakt || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
       .map((k: any) => ({ id: k.id, name: k.name, funktion: k.funktion, tel: k.telefon, mail: k.email, notiz: k.notiz })),
@@ -163,7 +163,7 @@ const leadZeile = (l: any) => ({
   lat: l.geo?.lat ?? null, lng: l.geo?.lng ?? null, stufe: l.stufe, temp: l.temp || 0,
   betreuer_id: l.betreuer || null, setter_id: l.setter || null, closer_id: l.closer || null,
   next_datum: l.next?.datum || null, next_zeit: l.next?.zeit || null, next_text: l.next?.text || null,
-  felder: l.felder || {}, verlustgrund: l.verlustgrund || null, termin_status: l.terminStatus || null, no_shows: l.noShows || 0,
+  felder: l.felder || {}, verlustgrund: l.verlustgrund || null, termin_status: l.terminStatus || null, no_shows: l.noShows || 0, versuche: l.versuche || 0,
   uebergabe: l.uebergabe || null, erfasst: l.erfasst || null, fotos: (l.fotos || []).filter((f: string) => !f.startsWith("data:")),
   quelle: l.quelle || null, angelegt: l.angelegt || M.HEUTE,
 })
@@ -621,7 +621,7 @@ async function verarbeiten() {
       if (!M.SPERRLISTE.some((e: any) => e.id === r.id)) (M.SPERRLISTE as any[]).push(sperreAus(r))
     } else if (t === "anruf" && art === "INSERT") {
       const tg = M.anrufTag(r.profil_id, String(r.zeit).slice(0, 10)); tg.wahl++
-      if (r.ergebnis !== "nicht") tg.erreicht++
+      if (!M.NICHT_ERREICHT.includes(r.ergebnis)) tg.erreicht++
       if (r.ergebnis === "termin") tg.termine++
       if (r.einwand) tg.einwaende[r.einwand] = (tg.einwaende[r.einwand] || 0) + 1
     } else if (t === "besuch") {

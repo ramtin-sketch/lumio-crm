@@ -31,7 +31,7 @@ export function AppSidebar() {
   const faelligHeute = meine.filter((l: any) => M.faellig(l)).length
   const meineUebergaben = M.TERMINE.filter((t: any) => t.status === "geplant" && t.closer === ui.ich).length
   const neuTerminieren = M.LEADS.filter((l: any) => l.terminStatus === "noshow" && M.istOffen(l) && l.betreuer === ui.ich).length
-  const anrufListe = M.LEADS.filter((l: any) => M.istTel(l) && M.istOffen(l) && (l.stufe === "recherche" || l.stufe === "setting") && l.betreuer === ui.ich && !M.istGesperrt(l)).length
+  const anrufListe = M.LEADS.filter((l: any) => M.imAnrufPool(l) && l.betreuer === ui.ich).length
 
   // Neue Warnungen (letzte 7 Tage, noch nicht angesehen) als Zahl am Menüpunkt
   const [warnungen, setWarnungen] = React.useState(0)

@@ -85,13 +85,17 @@ const MANDATE = [
 
 /* ---------- Phasen je Geschäftsbereich ---------- */
 const STUFEN = {
+  // Werbemandate (seit 21.10.2026): Kontaktaufnahme getrennt vom Gespräch. Nicht erreicht zählt nur Versuche, ändert keine Phase.
   werbung: [
-    { id: 'recherche', name: 'Recherchiert',  p: 5 },
-    { id: 'setting',   name: 'Im Setting',    p: 15 },
-    { id: 'termin',    name: 'Termin steht',  p: 30 },
-    { id: 'closing',   name: 'Im Closing',    p: 60 },
-    { id: 'gewonnen',  name: 'Abgeschlossen', ende: true },
-    { id: 'verloren',  name: 'Verloren',      ende: true }
+    { id: 'recherche',    name: 'Neu',              p: 3 },
+    { id: 'anrufversuch', name: 'Im Anrufversuch',  p: 5 },
+    { id: 'setting',      name: 'Erreicht',         p: 15 },
+    { id: 'termin',       name: 'Termin steht',     p: 30 },
+    { id: 'folgetermin',  name: 'Folgetermin',      p: 45 },
+    { id: 'closing',      name: 'Im Closing',       p: 60 },
+    { id: 'gewonnen',     name: 'Abgeschlossen',    ende: true },
+    { id: 'verloren',     name: 'Verloren',         ende: true },
+    { id: 'spaeter',      name: 'Später wieder',    ende: true, parken: true }
   ],
   bildung: [
     { id: 'recherche', name: 'Recherchiert',           p: 5 },
@@ -138,7 +142,7 @@ const SYSTEM_PERSONEN = [];
 function person(id){ return PERSONEN.find(p => p.id === id) || SYSTEM_PERSONEN.find(p => p.id === id) || null; }
 function lead(o){
   const l = Object.assign({
-    id: neueId(), felder: {}, kontakte: [], verlauf: [], next: null, temp: 0,
+    id: neueId(), felder: {}, kontakte: [], verlauf: [], next: null, temp: 0, versuche: 0,
     setter: null, closer: null, betreuer: null, abschluss: null, verlustgrund: null, angelegt: tag(-12)
   }, o);
   l.bereich = mandat(l.mandat).bereich;
@@ -161,7 +165,7 @@ lead({ mandat: 'm1', name: 'Autohaus Petersen', ort: 'Lüneburg', stufe: 'termin
   verlauf: [V(-6, 'kevin', 'anruf', 'Erreicht, Termin für heute')] });
 lead({ mandat: 'm1', name: 'Möbel Hansen', ort: 'Pinneberg', stufe: 'setting', setter: 'ramtin', betreuer: 'ramtin', next: N(0, null, 'Rückruf Geschäftsführer'),
   verlauf: [V(-2, 'ramtin', 'anruf', 'Sekretariat, Rückruf heute zugesagt')] });
-lead({ mandat: 'm1', name: 'Immobilien Nordstern', ort: 'Hamburg', stufe: 'setting', setter: 'kevin', betreuer: 'kevin', next: N(-1, null, 'Zweiter Anrufversuch'),
+lead({ mandat: 'm1', name: 'Immobilien Nordstern', ort: 'Hamburg', stufe: 'anrufversuch', versuche: 1, setter: 'kevin', betreuer: 'kevin', next: N(-1, null, 'Versuch 2 von 6 · nachmittags'),
   verlauf: [V(-4, 'kevin', 'anruf', 'Nicht erreicht')] });
 lead({ mandat: 'm1', name: 'Gartencenter Grün', ort: 'Norderstedt', stufe: 'recherche', betreuer: 'ramtin', next: N(2, null, 'Entscheider recherchieren') });
 lead({ mandat: 'm1', name: 'Hörgeräte Kaiser', ort: 'Kiel', stufe: 'closing', temp: 1, setter: 'kevin', closer: 'kevin', betreuer: 'kevin', terminStatus: 'gelaufen',
@@ -402,6 +406,19 @@ const ENTSCHEIDER = [['ja', 'Ja, Entscheider war dran'], ['nein', 'Nein, nur Vor
 function stufeVon(l){ return STUFEN[l.bereich].find(s => s.id === l.stufe); }
 function istOffen(l){ const s = stufeVon(l); return !!s && !s.ende; }
 
+/* ---------- Telefonakquise Werbemandate ---------- */
+const MAX_VERSUCHE = 6;
+const ABSTAND_TAGE = [1, 1, 1, 2, 3, 4];          // nach Versuch n: so viele Tage bis zum nächsten
+const NICHT_ERREICHT = ['nicht', 'mailbox', 'zentrale', 'falsche_nummer'];  // Entscheider nicht gesprochen
+const istNeuesModell = (l) => l.bereich === 'werbung';
+function monatePlus(n){ const d = new Date(T0); d.setMonth(d.getMonth() + n); return iso(d); }
+/* Gehört der Lead heute in die Anrufliste? (offen in der Kontaktaufnahme, oder "Später wieder" ist fällig) */
+function imAnrufPool(l){
+  if (!istTel(l) || istGesperrt(l)) return false;
+  if (l.stufe === 'spaeter') return !!(l.next && l.next.datum && l.next.datum <= HEUTE);
+  return istOffen(l) && ['recherche', 'anrufversuch', 'setting'].includes(l.stufe);
+}
+
 /* LUMIO-Vergütung aus einem Abschluss, über die ganze Laufzeit */
 function lumioGesamt(l){
   const a = l.abschluss; if (!a) return 0;
@@ -579,12 +596,13 @@ function protokoll(l, wer, erg, x){
   if (tel && person(wer).rolle !== 'hv'){
     const t = anrufTag(wer, HEUTE);
     t.wahl++;
-    if (erg !== 'nicht') t.erreicht++;
+    if (!NICHT_ERREICHT.includes(erg)) t.erreicht++;
     if (erg === 'termin') t.termine++;
-    if (erg === 'kein' && x.einwand) t.einwaende[x.einwand] = (t.einwaende[x.einwand] || 0) + 1;
+    if ((erg === 'kein' || erg === 'spaeter') && x.einwand) t.einwaende[x.einwand] = (t.einwaende[x.einwand] || 0) + 1;
     ANRUF_LOG.push({ id: MODUS.echt ? crypto.randomUUID() : ANRUF_LOG.length + 1, wer, lead: l.id, zeit: new Date().toISOString(), ergebnis: erg, einwand: x.einwand || null });
   }
   const art = tel ? 'anruf' : 'besuch';
+  if (tel && istNeuesModell(l)){ const m = protokollWerbung(l, wer, erg, x); if (m) return m; }
   if (erg === 'nicht'){
     verlauf(l, wer, art, tel ? 'Nicht erreicht' : 'Nicht angetroffen');
     if (!l.next || l.next.datum <= HEUTE) l.next = { datum: tag(1), zeit: null, text: tel ? 'Nächster Anrufversuch' : 'Nochmal vorbeigehen' };
@@ -624,6 +642,71 @@ function protokoll(l, wer, erg, x){
   }
 }
 
+/* Werbemandate: mehr Ergebnisse, Versuche zählen statt Phase springen. Gibt die Meldung zurück oder null (dann gilt der alte Ablauf). */
+function protokollWerbung(l, wer, erg, x){
+  const inKontakt = ['recherche', 'anrufversuch', 'spaeter'].includes(l.stufe);
+  const kontaktiert = () => { if (inKontakt) { l.stufe = 'setting'; } l.versuche = 0; };
+  if (NICHT_ERREICHT.includes(erg)){
+    const titel = { nicht: 'Nicht erreicht', mailbox: 'Mailbox', zentrale: 'Nur Zentrale/Vorzimmer', falsche_nummer: 'Falsche Nummer' }[erg];
+    verlauf(l, wer, 'anruf', titel, kurzText(x.notiz));
+    if (erg === 'falsche_nummer'){
+      if (l.stufe === 'recherche' || l.stufe === 'spaeter') l.stufe = 'anrufversuch';
+      l.next = { datum: HEUTE, zeit: null, text: 'Richtige Nummer recherchieren' };
+      return 'Notiert. Als Aufgabe: richtige Nummer recherchieren.';
+    }
+    if (!inKontakt){
+      // Schon im Gespräch (z. B. Rückruf nicht erreicht): nur nächsten Versuch planen
+      if (!l.next || l.next.datum <= HEUTE) l.next = { datum: tag(1), zeit: null, text: 'Nochmal anrufen' };
+      return 'Notiert. Nächster Versuch morgen.';
+    }
+    l.versuche = (l.versuche || 0) + 1;
+    if (l.versuche >= MAX_VERSUCHE){
+      const d = monatePlus(3);
+      l.stufe = 'spaeter'; l.versuche = 0; l.next = { datum: d, zeit: null, text: 'Neuer Anlauf' };
+      verlauf(l, wer, 'stufe', 'Später wieder', MAX_VERSUCHE + ' Versuche ohne Kontakt. Neuer Anlauf am ' + dKurz(d));
+      return MAX_VERSUCHE + '. Versuch ohne Kontakt. Neuer Anlauf am ' + dKurz(d) + ' eingeplant';
+    }
+    l.stufe = 'anrufversuch';
+    const n = l.versuche, d = tag(ABSTAND_TAGE[n - 1] || 1);
+    const tageszeit = n % 2 ? 'nachmittags' : 'vormittags';   // Tageszeit wechseln
+    l.next = { datum: d, zeit: null, text: 'Versuch ' + (n + 1) + ' von ' + MAX_VERSUCHE + ' · ' + tageszeit };
+    const tagText = wann(l.next).replace(/^Morgen/, 'morgen').replace(/^Heute/, 'heute');
+    return 'Versuch ' + n + ' von ' + MAX_VERSUCHE + ' notiert. Nächster Versuch ' + tagText + ' ' + tageszeit + '.';
+  }
+  if (erg === 'falscher_ap'){
+    const name = kurzText(x.name, 120);
+    if (name) l.kontakte.push({ name, funktion: 'Empfehlung', tel: kurzText(x.tel, 40), mail: null, notiz: null });
+    verlauf(l, wer, 'anruf', 'Falscher Ansprechpartner', name ? 'Empfehlung: ' + name + (x.tel ? ', ' + x.tel : '') : 'Keine Empfehlung');
+    if (inKontakt){ l.stufe = 'anrufversuch'; l.versuche = 0; }
+    l.next = { datum: name ? HEUTE : tag(1), zeit: null, text: name ? 'Empfehlung anrufen: ' + name : 'Richtigen Ansprechpartner finden' };
+    return name ? 'Notiert. ' + name + ' steht als Ansprechpartner drin.' : 'Notiert.';
+  }
+  if (erg === 'rueckruf'){
+    verlauf(l, wer, 'anruf', 'Erreicht, Rückruf vereinbart', dKurz(x.datum) + (x.zeit ? ' ' + x.zeit : ''));
+    kontaktiert();
+    l.next = { datum: x.datum, zeit: x.zeit || null, text: 'Rückruf' };
+    return 'Rückruf am ' + dKurz(x.datum) + ' eingetragen.';
+  }
+  if (erg === 'info'){
+    const mail = kurzText(x.mail, 160);
+    const k = l.kontakte[0];
+    if (mail && k && !k.mail) k.mail = mail;
+    verlauf(l, wer, 'anruf', 'Erreicht, will Infos per Mail', mail || null);
+    kontaktiert();
+    l.next = { datum: tag(2), zeit: null, text: 'Nach Info-Mail nachfassen' };
+    return 'Notiert. In 2 Tagen nachfassen.';
+  }
+  if (erg === 'spaeter'){
+    const d = x.datum || monatePlus(3);
+    verlauf(l, wer, 'anruf', 'Kein Bedarf jetzt, später wieder', (x.einwand ? 'Einwand: ' + x.einwand + ' · ' : '') + 'Neuer Anlauf am ' + dKurz(d));
+    l.stufe = 'spaeter'; l.versuche = 0; l.next = { datum: d, zeit: null, text: 'Neuer Anlauf' };
+    return 'Neuer Anlauf am ' + dKurz(d) + ' eingeplant';
+  }
+  if (erg === 'termin' || erg === 'kein') l.versuche = 0;
+  return null;
+}
+function kurzText(s, n){ if (s == null) return null; const t = String(s).trim().slice(0, n || 500); return t || null; }
+
 function abschliessen(l, wer, w){
   const k = mandat(l.mandat).k;
   l.abschluss = { datum: HEUTE, status: 'offen' };
@@ -642,8 +725,32 @@ function abschliessen(l, wer, w){
 function offenerTermin(l){ for (let i = TERMINE.length - 1; i >= 0; i--){ const t = TERMINE[i]; if (t.lead === l.id && t.ergebnis === 'offen') return t; } return null; }
 
 /* Closer trägt nach dem Termin ein, was passiert ist */
-function terminErgebnis(l, wer, erg){
+function terminErgebnis(l, wer, erg, x){
+  x = x || {};
   const t = offenerTermin(l);
+  if (erg === 'folgetermin'){
+    if (t){ t.status = 'gelaufen'; }
+    const closer = l.closer || wer;
+    terminEintrag({ lead: l.id, setter: l.setter || wer, closer, datum: x.datum, zeit: x.zeit || null, status: 'geplant' });
+    l.stufe = 'folgetermin'; l.terminStatus = 'geplant';
+    l.next = { datum: x.datum, zeit: x.zeit || null, text: 'Folgetermin' };
+    verlauf(l, wer, 'termin', 'Folgetermin vereinbart', dKurz(x.datum) + (x.zeit ? ' ' + x.zeit : ''));
+    return 'Folgetermin am ' + dKurz(x.datum) + ' eingetragen.';
+  }
+  if (erg === 'angebot'){
+    if (t){ t.status = 'gelaufen'; }
+    l.stufe = 'closing'; l.terminStatus = 'gelaufen';
+    l.next = { datum: tag(3), zeit: null, text: 'Angebot nachfassen' };
+    verlauf(l, wer, 'termin', 'Termin gelaufen, Angebot raus');
+    return 'Angebot raus. In 3 Tagen nachfassen.';
+  }
+  if (erg === 'noshow' && l.stufe === 'folgetermin'){
+    if (t){ t.status = 'noshow'; }
+    l.noShows = (l.noShows || 0) + 1; l.terminStatus = 'noshow';
+    l.next = { datum: HEUTE, zeit: null, text: 'Folgetermin neu vereinbaren' };
+    verlauf(l, wer, 'termin', 'Folgetermin: nicht erschienen', 'Neu vereinbaren');
+    return 'Nicht erschienen. Folgetermin neu vereinbaren.';
+  }
   if (erg === 'gelaufen'){
     if (t){ t.status = 'gelaufen'; }
     l.stufe = 'closing'; l.terminStatus = 'gelaufen';
@@ -718,5 +825,6 @@ export {
   MONATSNAMEN, WOCHENTAGE, eur, zahl, prozent, dKurz, monatName, wann, faellig, ueberfaellig,
   verlauf, protokoll, abschliessen, neuerLead, plural, hochrechnungBetrag, umsatzMonat,
   istTel, BEREICHE, MODUS, SPERRLISTE, ANRUF_LOG, telNorm, mailNorm, firmaNorm, sperrTreffer, istGesperrt, sperreHinzu, sperren, dubletten, datenErsetzen,
-  TERMINE, BUDGETS, ENTSCHEIDER, terminErgebnis, setterCloser, closerVorschlag, quote, verlustAufTermin
+  TERMINE, BUDGETS, ENTSCHEIDER, terminErgebnis, setterCloser, closerVorschlag, quote, verlustAufTermin,
+  MAX_VERSUCHE, NICHT_ERREICHT, istNeuesModell, imAnrufPool, monatePlus
 };
