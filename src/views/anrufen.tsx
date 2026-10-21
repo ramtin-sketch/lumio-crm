@@ -17,7 +17,7 @@ export function Anrufen() {
   const frueher = M.ANRUF_TAGE.filter((a: any) => a.person === ui.ich && a.datum < M.HEUTE).sort((a: any, b: any) => b.datum.localeCompare(a.datum)).slice(0, 10)
   const avg = (k: string) => (frueher.length ? frueher.reduce((s: number, a: any) => s + a[k], 0) / frueher.length : 0)
 
-  let ls = M.LEADS.filter((l: any) => M.istTel(l) && M.istOffen(l) && (l.stufe === "recherche" || l.stufe === "setting") && l.betreuer === ui.ich && !M.istGesperrt(l))
+  let ls = M.LEADS.filter((l: any) => M.imAnrufPool(l) && l.betreuer === ui.ich)
   if (ui.mandatFilter !== "alle") ls = ls.filter((l: any) => l.mandat === ui.mandatFilter)
   const rang = (l: any) => (!l.next ? 2 : l.next.datum < M.HEUTE ? 0 : l.next.datum === M.HEUTE ? 1 : 3)
   ls.sort((a: any, b: any) => rang(a) - rang(b) || (a.next ? a.next.datum : "9").localeCompare(b.next ? b.next.datum : "9"))

@@ -15,6 +15,7 @@ import { anonymisieren, fotoUrls } from "@/daten/echt"
 import { bump, neuZeichnen, useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
+import { PapierkorbDialog } from "@/papierkorb-dialog"
 import { Map as MapIcon, Mail, Navigation, Phone, ShieldBan, Trash2, UserPlus } from "lucide-react"
 
 function Abschnitt({ titel, children }: { titel: string; children: React.ReactNode }) {
@@ -44,6 +45,7 @@ function Inhalt({ l }: { l: any }) {
   const [abschlussAuf, setAbschlussAuf] = React.useState(false)
   const [kontaktAuf, setKontaktAuf] = React.useState(false)
   const [loeschAuf, setLoeschAuf] = React.useState(false)
+  const [korbAuf, setKorbAuf] = React.useState(false)
   const sperre = M.sperrTreffer(l)
   const kGesperrt = (k: any) => M.SPERRLISTE.some((e: any) => (k.tel && e.telefon === M.telNorm(k.tel)) || (k.mail && e.email === M.mailNorm(k.mail)))
   const aendern = (fn: () => void, msg?: string) => { fn(); bump(); if (msg) toast(msg) }
@@ -162,7 +164,7 @@ function Inhalt({ l }: { l: any }) {
           </div>
         )}
 
-        {M.istOffen(l) && (
+        {(M.istOffen(l) || l.stufe === "spaeter") && (
           <>
             {!(sperre && tel) && <Abschnitt titel={(tel ? "Anruf" : "Besuch") + " protokollieren"}><Ergebnis l={l} /></Abschnitt>}
             <Abschnitt titel="Nächster Schritt">
@@ -227,9 +229,14 @@ function Inhalt({ l }: { l: any }) {
           </ol>
         </Abschnitt>
 
-        {gf && l.name !== "[gelöscht]" && (
-          <Abschnitt titel="Datenschutz">
-            {!loeschAuf ? <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => setLoeschAuf(true)}><Trash2 />Daten auf Anfrage löschen</Button> : (
+        {gf && (
+          <Abschnitt titel="Löschen">
+            <div className="flex flex-wrap gap-x-2">
+              <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => setKorbAuf(true)}><Trash2 />In den Papierkorb</Button>
+              {l.name !== "[gelöscht]" && !loeschAuf && <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLoeschAuf(true)}><ShieldBan />Daten auf Anfrage löschen (DSGVO)</Button>}
+            </div>
+            <PapierkorbDialog leads={[l]} offen={korbAuf} onOffen={setKorbAuf} />
+            {l.name === "[gelöscht]" || !loeschAuf ? null : (
               <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
                 <p className="text-sm">Name, Adresse, Ansprechpartner, Fotos und Notizen werden unwiderruflich überschrieben. Zahlen für Umsatz und Provision bleiben ohne Namen erhalten.</p>
                 <div className="flex flex-wrap gap-2">

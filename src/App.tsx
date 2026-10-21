@@ -29,11 +29,12 @@ import { aufStatus, syncStatus, liveStand } from "@/daten/echt"
 import { Datenschutz } from "@/views/datenschutz"
 import { ImportExport } from "@/views/import"
 import { Kalender } from "@/views/kalender"
+import { Papierkorb } from "@/views/papierkorb"
 
 const TITEL: Record<string, string> = {
   heute: "Heute", dashboard: "Dashboard", werbung: "Werbemandate", bildung: "Weiterbildung", standort: "Standortakquise", karte: "Karte",
   anrufen: "Anrufen", mandate: "Mandate", team: "Team & Provisionen", verdienst: "Mein Verdienst",
-  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sicherheit", d2d: "Door-to-Door", import: "Import & Export", kalender: "Kalender",
+  uebergaben: "Übergaben", termine: "Meine Termine", datenschutz: "Datenschutz & Sicherheit", d2d: "Door-to-Door", import: "Import & Export", kalender: "Kalender", papierkorb: "Papierkorb",
 }
 
 function SyncAnzeige() {
@@ -90,6 +91,7 @@ function Inhalt() {
     case "datenschutz": return <Datenschutz />
     case "kalender": return <Kalender />
     case "import": return <ImportExport />
+    case "papierkorb": return <Papierkorb />
   }
   return null
 }

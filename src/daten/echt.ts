@@ -84,7 +84,7 @@ export async function laden(session: Session) {
     const d = a.zeit.slice(0, 10), key = a.profil_id + d
     if (!tage.has(key)) tage.set(key, { person: a.profil_id, datum: d, wahl: 0, erreicht: 0, termine: 0, einwaende: {} })
     const t = tage.get(key); t.wahl++
-    if (a.ergebnis !== "nicht") t.erreicht++
+    if (!M.NICHT_ERREICHT.includes(a.ergebnis)) t.erreicht++
     if (a.ergebnis === "termin") t.termine++
     if (a.einwand) t.einwaende[a.einwand] = (t.einwaende[a.einwand] || 0) + 1
   })
@@ -132,7 +132,7 @@ function leadAus(r: any) {
     geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
     stufe: r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
     next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
-    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0,
+    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0, versuche: r.versuche || 0,
     uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,
     kontakte: (r.kontakt || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
       .map((k: any) => ({ id: k.id, name: k.name, funktion: k.funktion, tel: k.telefon, mail: k.email, notiz: k.notiz })),
@@ -163,7 +163,7 @@ const leadZeile = (l: any) => ({
   lat: l.geo?.lat ?? null, lng: l.geo?.lng ?? null, stufe: l.stufe, temp: l.temp || 0,
   betreuer_id: l.betreuer || null, setter_id: l.setter || null, closer_id: l.closer || null,
   next_datum: l.next?.datum || null, next_zeit: l.next?.zeit || null, next_text: l.next?.text || null,
-  felder: l.felder || {}, verlustgrund: l.verlustgrund || null, termin_status: l.terminStatus || null, no_shows: l.noShows || 0,
+  felder: l.felder || {}, verlustgrund: l.verlustgrund || null, termin_status: l.terminStatus || null, no_shows: l.noShows || 0, versuche: l.versuche || 0,
   uebergabe: l.uebergabe || null, erfasst: l.erfasst || null, fotos: (l.fotos || []).filter((f: string) => !f.startsWith("data:")),
   quelle: l.quelle || null, angelegt: l.angelegt || M.HEUTE,
 })
@@ -498,7 +498,7 @@ export async function exportMelden(art: string, anzahl: number) {
    Supabase schickt jede Änderung an alle offenen Geräte, aber nur an die, die den Datensatz sehen dürfen.
    Eigene Änderungen werden übersprungen (sind schon da). Leads und Häuser werden komplett frisch geholt,
    damit Ansprechpartner, Verlauf und Wohnungen stimmen. */
-const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat", "mandat_kontakt", "mandat_notiz", "mandat_termin"]
+const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat", "mandat_kontakt", "mandat_notiz", "mandat_termin", "lead_weg"]
 let kanal: any = null, liveIch = "", liveZeichnen: () => void = () => {}, liveTimer: any = null, warGetrennt = false, nachladenTimer: any = null
 let liveZustand: "aus" | "verbinde" | "live" | "getrennt" = "aus"
 export const liveStand = () => liveZustand
@@ -604,7 +604,10 @@ async function verarbeiten() {
   // Alles andere direkt aus der Nachricht
   for (const { t, r, wer, art } of einzelne.splice(0)) {
     if (wer && wer === liveIch) continue
-    if (t === "termin") {
+    if (t === "lead_weg") {
+      // Ein Lead liegt jetzt im Papierkorb: hier ausblenden (das Update selbst kommt nicht mehr an, weil ihn niemand mehr sehen darf)
+      if (!leadsLokalEntfernen([r.lead_id])) continue
+    } else if (t === "termin") {
       const x = terminAus(r), i = M.TERMINE.findIndex((y: any) => y.id === x.id)
       if (i >= 0) Object.assign(M.TERMINE[i], x); else (M.TERMINE as any[]).push(x)
       merke("termin:" + x.id, terminZeile(x))
@@ -618,7 +621,7 @@ async function verarbeiten() {
       if (!M.SPERRLISTE.some((e: any) => e.id === r.id)) (M.SPERRLISTE as any[]).push(sperreAus(r))
     } else if (t === "anruf" && art === "INSERT") {
       const tg = M.anrufTag(r.profil_id, String(r.zeit).slice(0, 10)); tg.wahl++
-      if (r.ergebnis !== "nicht") tg.erreicht++
+      if (!M.NICHT_ERREICHT.includes(r.ergebnis)) tg.erreicht++
       if (r.ergebnis === "termin") tg.termine++
       if (r.einwand) tg.einwaende[r.einwand] = (tg.einwaende[r.einwand] || 0) + 1
     } else if (t === "besuch") {
@@ -671,4 +674,74 @@ export async function akteTerminSpeichern(t: any) {
   const zeile = { id: t.id, mandat_id: mid(t.mandat), art: t.art, titel: t.titel, datum: t.datum, zeit: t.zeit || null, ort: t.ort || null, notiz: t.notiz || null, erledigt: !!t.erledigt, wer: t.wer || null }
   if (ECHT) { const { error } = await sb.from("mandat_termin").upsert(zeile); if (error) throw new Error(uebersetzen(error.message)) }
   const i = A.TERMINE.findIndex((x: any) => x.id === t.id); if (i >= 0) Object.assign(A.TERMINE[i], t); else (A.TERMINE as any[]).push(t)
+}
+
+/* ---------- Papierkorb (Leads) ----------
+   In den Papierkorb: Geschäftsführung (und die Claude-Verbindung). Wiederherstellen und endgültig löschen: nur Geschäftsführung.
+   Im Papierkorb sieht die Datenbank den Lead für niemanden mehr; nach 30 Tagen wird er nachts endgültig gelöscht. */
+export type PapierkorbEintrag = { id: string; name: string; ort: string | null; bereich: string; mandat: string | null; stufe: string; kontakte: number; geloescht_am: string; geloescht_von: string | null; endgueltig_am: string }
+
+/* Leads (mit ihren Terminen) aus dem Speicher der App nehmen. Gibt zurück, wie viele es waren. */
+export function leadsLokalEntfernen(ids: string[]) {
+  const weg = new Set(ids)
+  let n = 0
+  for (let i = M.LEADS.length - 1; i >= 0; i--) {
+    const l: any = M.LEADS[i]
+    if (!weg.has(l.id)) continue
+    M.LEADS.splice(i, 1); n++
+    gespeichert.delete("lead:" + l.id); gespeichert.delete("abschluss:" + l.id)
+    l.kontakte.forEach((k: any) => gespeichert.delete("kontakt:" + k.id))
+  }
+  for (let i = M.TERMINE.length - 1; i >= 0; i--) {
+    const t: any = M.TERMINE[i]
+    if (t.lead && weg.has(t.lead)) { M.TERMINE.splice(i, 1); gespeichert.delete("termin:" + t.id) }
+  }
+  return n
+}
+export async function leadsInPapierkorb(ids: string[]) {
+  const { data, error } = await sb.rpc("leads_in_papierkorb", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  leadsLokalEntfernen(ids)
+  return Number(data) || 0
+}
+export async function papierkorbLaden() {
+  const { data, error } = await sb.rpc("papierkorb_liste")
+  if (error) throw new Error(uebersetzen(error.message))
+  return (data || []) as PapierkorbEintrag[]
+}
+export async function leadsWiederherstellen(ids: string[]) {
+  const { data, error } = await sb.rpc("leads_wiederherstellen", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  await leadsHolen(ids)
+  return Number(data) || 0
+}
+export async function papierkorbEndgueltig(ids: string[]) {
+  const { data, error } = await sb.rpc("papierkorb_endgueltig", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  return Number(data) || 0
+}
+/* Wiederhergestellte Leads samt Terminen frisch holen und in die App übernehmen */
+async function leadsHolen(ids: string[]) {
+  if (!ids.length) return
+  const [{ data: ls, error: e1 }, { data: ts, error: e2 }] = await Promise.all([
+    sb.from("lead").select("*, kontakt(*), verlauf(*), abschluss(*)").in("id", ids),
+    sb.from("termin").select("*").in("lead_id", ids),
+  ])
+  if (e1) throw new Error(uebersetzen(e1.message))
+  if (e2) throw new Error(uebersetzen(e2.message))
+  for (const r of ls || []) {
+    if (!M.MANDATE.some((m: any) => m.id === String(r.mandat_id))) continue
+    const l: any = leadAus(r)
+    if (l.bereich === "standort") K.verorten(l)
+    const i = M.LEADS.findIndex((x: any) => x.id === l.id)
+    if (i >= 0) Object.assign(M.LEADS[i], l); else (M.LEADS as any[]).push(l)
+    merke("lead:" + l.id, leadZeile(l)); l.kontakte.forEach((k: any) => merke("kontakt:" + k.id, kontaktZeile(l, k)))
+    if (l.abschluss) merke("abschluss:" + l.id, abschlussZeile(l))
+  }
+  for (const r of ts || []) {
+    const t: any = terminAus(r)
+    const i = M.TERMINE.findIndex((x: any) => x.id === t.id)
+    if (i >= 0) Object.assign(M.TERMINE[i], t); else (M.TERMINE as any[]).push(t)
+    merke("termin:" + t.id, terminZeile(t))
+  }
 }

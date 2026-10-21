@@ -14,7 +14,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
-import { ArrowRight, CalendarClock, Flame, KanbanSquare, List, Plus, Search } from "lucide-react"
+import { PapierkorbDialog } from "@/papierkorb-dialog"
+import { ArrowRight, CalendarClock, Flame, KanbanSquare, List, ListChecks, Plus, Search, Trash2, X } from "lucide-react"
 
 function sortOffen(a: any, b: any) {
   const da = a.next ? a.next.datum : "9999", db = b.next ? b.next.datum : "9999"
@@ -40,7 +41,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
   if (gf && bereich !== "standort" && nurMeine) ls = ls.filter((l: any) => l.betreuer === ui.ich || l.setter === ui.ich || l.closer === ui.ich)
   if (q) { const s = q.toLowerCase(); ls = ls.filter((l: any) => (l.name + " " + (l.ort || "") + " " + l.kontakte.map((k: any) => k.name).join(" ")).toLowerCase().includes(s)) }
   const stufen = M.STUFEN[bereich].filter((s: any) => !s.ende)
-  const won = ls.filter((l: any) => l.stufe === "gewonnen"), lost = ls.filter((l: any) => l.stufe === "verloren")
+  const won = ls.filter((l: any) => l.stufe === "gewonnen"), lost = ls.filter((l: any) => l.stufe === "verloren"), spaeter = ls.filter((l: any) => l.stufe === "spaeter")
   const wonM = won.filter((l: any) => l.abschluss && M.ym(l.abschluss.datum) === M.MONAT).length
 
   const ablegen = (stufe: string) => {
@@ -58,6 +59,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
   return (
     <>
       <Seitenkopf titel={titel} text={text}>
+        {gf && ansicht !== "liste" && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setAnsicht("liste")}><ListChecks />Mehrere löschen</Button>}
         <Button size="sm" variant="outline" onClick={() => ui.setNeu({ bereich, mandat: ui.mandatFilter !== "alle" ? ui.mandatFilter : undefined })}><Plus />{bereich === "werbung" ? "Werbekunde" : bereich === "bildung" ? "Arbeitgeber" : "Standort"}</Button>
       </Seitenkopf>
 
@@ -99,7 +101,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
               </TabsList>
             </Tabs>
           )}
-          <div className={cn("grid gap-3", mobil ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-4")}>
+          <div className={cn("grid gap-3", mobil ? "grid-cols-1" : stufen.length > 4 ? "grid-cols-3 2xl:grid-cols-6" : "grid-cols-2 xl:grid-cols-4")}>
             {stufen.filter((s: any) => !mobil || s.id === mobilStufe).map((s: any) => {
               const inS = ls.filter((l: any) => l.stufe === s.id).sort(sortOffen)
               return (
@@ -123,6 +125,7 @@ export function Brett({ bereich }: { bereich: "werbung" | "bildung" | "standort"
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>{bereich === "werbung" ? "Abgeschlossen" : bereich === "bildung" ? "Angemeldet" : "Freigegeben"}: {won.length} <span className="text-muted-foreground">({wonM} im {M.MONATSNAMEN[M.T0.getMonth()]})</span></Button>
             <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>{bereich !== "standort" ? "Verloren" : "Abgelehnt"}: {lost.length}</Button>
+            {bereich === "werbung" && <Button variant="ghost" size="sm" onClick={() => setAnsicht("liste")}>Später wieder: {spaeter.length}</Button>}
             {!mobil && <span className="ml-auto text-xs">Tipp: Karten mit der Maus in eine andere Spalte ziehen</span>}
           </div>
         </>
@@ -162,20 +165,42 @@ function LeadKarte({ l, onDrag }: { l: any; onDrag: (an: boolean) => void }) {
 
 function Liste({ ls }: { ls: any[] }) {
   const ui = useUI()
+  const gf = ui.istGF
+  const [auswahl, setAuswahl] = React.useState<Set<string>>(() => new Set())
+  const [frage, setFrage] = React.useState(false)
   const offen = ls.filter(M.istOffen).sort(sortOffen)
   const zu = ls.filter((l: any) => !M.istOffen(l)).sort((a: any, c: any) => ((c.abschluss && c.abschluss.datum) || c.angelegt).localeCompare((a.abschluss && a.abschluss.datum) || a.angelegt))
   const zeigen = offen.concat(zu.slice(0, 60))
+  // Nur was hier gerade auch zu sehen bzw. gefiltert ist, zählt als ausgewählt
+  const gewaehlt = ls.filter((l: any) => auswahl.has(l.id))
+  const alleSichtbaren = zeigen.length > 0 && zeigen.every((l: any) => auswahl.has(l.id))
+  const umschalten = (id: string, an: boolean) => setAuswahl((a) => { const n = new Set(a); if (an) n.add(id); else n.delete(id); return n })
+  const sichtbareUmschalten = (an: boolean) => setAuswahl((a) => { const n = new Set(a); zeigen.forEach((l: any) => (an ? n.add(l.id) : n.delete(l.id))); return n })
   return (
+    <>
+    {gf && gewaehlt.length > 0 && (
+      <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-sm backdrop-blur">
+        <span className="text-sm font-medium tabular">{gewaehlt.length} ausgewählt</span>
+        {gewaehlt.length < ls.length && <Button size="sm" variant="ghost" onClick={() => setAuswahl(new Set(ls.map((l: any) => l.id)))}>Alle {ls.length} dieser Auswahl markieren</Button>}
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setAuswahl(new Set())}><X />Aufheben</Button>
+          <Button size="sm" variant="destructive" onClick={() => setFrage(true)}><Trash2 />In den Papierkorb</Button>
+        </div>
+      </div>
+    )}
+    {gf && <PapierkorbDialog leads={gewaehlt} offen={frage} onOffen={setFrage} onFertig={() => setAuswahl(new Set())} />}
     <Card className="py-0">
       <Table>
         <TableHeader><TableRow>
-          <TableHead className="pl-4">Name</TableHead><TableHead className="hidden md:table-cell">Mandat</TableHead><TableHead>Phase</TableHead>
+          {gf && <TableHead className="w-10 pl-4"><Checkbox checked={alleSichtbaren} onCheckedChange={(v) => sichtbareUmschalten(!!v)} aria-label="Alle sichtbaren auswählen" /></TableHead>}
+          <TableHead className={gf ? "" : "pl-4"}>Name</TableHead><TableHead className="hidden md:table-cell">Mandat</TableHead><TableHead>Phase</TableHead>
           <TableHead className="hidden sm:table-cell">Nächster Schritt</TableHead><TableHead className="hidden md:table-cell">Betreuer</TableHead><TableHead className="pr-4 text-right">LUMIO</TableHead>
         </TableRow></TableHeader>
         <TableBody>
           {zeigen.map((l: any) => (
-            <TableRow key={l.id} className="cursor-pointer" onClick={() => ui.oeffne(l.id)}>
-              <TableCell className="pl-4"><div className="font-medium">{l.name}</div><div className="text-xs text-muted-foreground">{l.ort}</div></TableCell>
+            <TableRow key={l.id} className="cursor-pointer" data-state={auswahl.has(l.id) ? "selected" : undefined} onClick={() => ui.oeffne(l.id)}>
+              {gf && <TableCell className="w-10 pl-4" onClick={(e) => e.stopPropagation()}><Checkbox checked={auswahl.has(l.id)} onCheckedChange={(v) => umschalten(l.id, !!v)} aria-label={l.name + " auswählen"} /></TableCell>}
+              <TableCell className={gf ? "" : "pl-4"}><div className="font-medium">{l.name}</div><div className="text-xs text-muted-foreground">{l.ort}</div></TableCell>
               <TableCell className="hidden md:table-cell">{M.mandat(l.mandat).name}</TableCell>
               <TableCell><StufeBadge l={l} /></TableCell>
               <TableCell className={cn("hidden max-w-64 truncate sm:table-cell", M.ueberfaellig(l) && "text-destructive")}>
@@ -185,10 +210,11 @@ function Liste({ ls }: { ls: any[] }) {
               <TableCell className="pr-4 text-right tabular">{l.abschluss ? M.eur(M.lumioGesamt(l)) : ""}</TableCell>
             </TableRow>
           ))}
-          {zeigen.length === 0 && <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Keine Einträge für diese Auswahl.</TableCell></TableRow>}
+          {zeigen.length === 0 && <TableRow><TableCell colSpan={gf ? 7 : 6} className="py-10 text-center text-muted-foreground">Keine Einträge für diese Auswahl.</TableCell></TableRow>}
         </TableBody>
       </Table>
       {zu.length > 60 && <div className="border-t px-4 py-3 text-xs text-muted-foreground">{zu.length - 60} ältere abgeschlossene Einträge ausgeblendet. Über die Suche findest du sie.</div>}
     </Card>
+    </>
   )
 }

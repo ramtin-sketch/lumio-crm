@@ -119,7 +119,8 @@ function Protokoll() {
   const aenderungen = (z: any) => {
     if (z.aktion === "anonymisiert") return "Personenbezogene Daten gelöscht (" + (z.neu?.grund || "auf Anfrage") + ")"
     if (z.aktion === "insert") return "angelegt"
-    if (z.aktion === "delete") return "gelöscht"
+    if (z.aktion === "delete") return "endgültig gelöscht"
+    if (z.tabelle === "lead" && z.neu && "geloescht_am" in z.neu) return z.neu.geloescht_am ? "in den Papierkorb gelegt" : "aus dem Papierkorb wiederhergestellt"
     if (!z.neu) return "geändert (Details nach 12 Monaten entfernt)"
     return Object.keys(z.neu).filter((k) => FELDER[k]).map((k) => `${FELDER[k]}: ${wert(k, z.alt?.[k])} → ${wert(k, z.neu[k])}`).join(" · ") || "Details geändert"
   }
@@ -254,7 +255,7 @@ function ClaudeVerbindung({ echt }: { echt: boolean }) {
   return (
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="size-4" />Claude-Verbindung</CardTitle>
-        <CardDescription>Damit du Claude im Chat sagen kannst, was ins CRM soll. Claude arbeitet dabei als eigenes Konto „Claude (Assistent)“ und darf nur Leads, Ansprechpartner, Notizen, Termine und die Sperrliste lesen und schreiben. Nichts löschen, keine Abschlüsse, keine Provisionen, kein Door-to-Door, keine Zugänge. Jede Änderung steht im Protokoll.</CardDescription></CardHeader>
+        <CardDescription>Damit du Claude im Chat sagen kannst, was ins CRM soll. Claude arbeitet dabei als eigenes Konto „Claude (Assistent)“ und darf nur Leads, Ansprechpartner, Notizen, Termine und die Sperrliste lesen und schreiben. Leads darf Claude nur in den Papierkorb legen, gewonnene nicht, und nichts endgültig löschen. Keine Abschlüsse, keine Provisionen, kein Door-to-Door, keine Zugänge. Jede Änderung steht im Protokoll.</CardDescription></CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!echt ? <NurEcht text="In der echten App richtest du hier die Verbindung ein." /> : !stand ? <Laedt /> : (
           <>
@@ -326,6 +327,7 @@ function Regeln() {
     ["Server in Frankfurt", "Die Daten liegen bei Supabase in der EU (eu-central-1)."],
     ["Jeder sieht nur seins", "Setter sehen ihre Telefon-Leads ohne Umsätze, Handelsvertreter nur ihre eigenen Standorte und ihre Provision. Das prüft die Datenbank selbst, nicht nur die App."],
     ["Änderungsprotokoll", "Jede Änderung an Leads, Ansprechpartnern, Abschlüssen, Mandaten, Gebieten, Sperrliste und Zugängen wird mit Name und Uhrzeit festgehalten."],
+    ["Papierkorb", "Gelöschte Leads liegen 30 Tage im Papierkorb (nur Geschäftsführung) und lassen sich dort wiederherstellen. Danach werden sie nachts endgültig gelöscht."],
     ["Löschen auf Anfrage", "Im Lead unten: „Daten auf Anfrage löschen“ (nur Geschäftsführung). Personenbezogenes wird überschrieben, auch im Protokoll."],
     ["Sperrliste", "„Will nie wieder angerufen werden“ beim Anruf oder hier von Hand. Gilt für alle und für spätere Importe."],
     ["Keine Gesprächsaufnahmen", "Anrufe werden nur als Ergebnis gezählt, nicht aufgenommen."],

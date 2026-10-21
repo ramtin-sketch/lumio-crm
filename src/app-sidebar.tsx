@@ -17,7 +17,7 @@ import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check, Trash2,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -31,7 +31,7 @@ export function AppSidebar() {
   const faelligHeute = meine.filter((l: any) => M.faellig(l)).length
   const meineUebergaben = M.TERMINE.filter((t: any) => t.status === "geplant" && t.closer === ui.ich).length
   const neuTerminieren = M.LEADS.filter((l: any) => l.terminStatus === "noshow" && M.istOffen(l) && l.betreuer === ui.ich).length
-  const anrufListe = M.LEADS.filter((l: any) => M.istTel(l) && M.istOffen(l) && (l.stufe === "recherche" || l.stufe === "setting") && l.betreuer === ui.ich && !M.istGesperrt(l)).length
+  const anrufListe = M.LEADS.filter((l: any) => M.imAnrufPool(l) && l.betreuer === ui.ich).length
 
   // Neue Warnungen (letzte 7 Tage, noch nicht angesehen) als Zahl am Menüpunkt
   const [warnungen, setWarnungen] = React.useState(0)
@@ -68,6 +68,7 @@ export function AppSidebar() {
           { id: "team", titel: "Team & Provisionen", icon: Users },
           { id: "import", titel: "Import & Export", icon: FileSpreadsheet },
           { id: "datenschutz", titel: "Datenschutz", icon: ShieldCheck, zahl: warnungen },
+          { id: "papierkorb", titel: "Papierkorb", icon: Trash2 },
         ] },
       ]
     : ich.rolle === "setter" ? [
