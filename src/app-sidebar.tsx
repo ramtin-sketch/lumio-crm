@@ -17,7 +17,7 @@ import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check, Trash2,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -68,6 +68,7 @@ export function AppSidebar() {
           { id: "team", titel: "Team & Provisionen", icon: Users },
           { id: "import", titel: "Import & Export", icon: FileSpreadsheet },
           { id: "datenschutz", titel: "Datenschutz", icon: ShieldCheck, zahl: warnungen },
+          { id: "papierkorb", titel: "Papierkorb", icon: Trash2 },
         ] },
       ]
     : ich.rolle === "setter" ? [

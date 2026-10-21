@@ -498,7 +498,7 @@ export async function exportMelden(art: string, anzahl: number) {
    Supabase schickt jede Änderung an alle offenen Geräte, aber nur an die, die den Datensatz sehen dürfen.
    Eigene Änderungen werden übersprungen (sind schon da). Leads und Häuser werden komplett frisch geholt,
    damit Ansprechpartner, Verlauf und Wohnungen stimmen. */
-const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat", "mandat_kontakt", "mandat_notiz", "mandat_termin"]
+const LIVE_TABELLEN = ["lead", "kontakt", "verlauf", "abschluss", "termin", "anruf", "gebiet", "sperrliste", "objekt", "wohnung", "besuch", "auftrag", "mandat", "mandat_kontakt", "mandat_notiz", "mandat_termin", "lead_weg"]
 let kanal: any = null, liveIch = "", liveZeichnen: () => void = () => {}, liveTimer: any = null, warGetrennt = false, nachladenTimer: any = null
 let liveZustand: "aus" | "verbinde" | "live" | "getrennt" = "aus"
 export const liveStand = () => liveZustand
@@ -604,7 +604,10 @@ async function verarbeiten() {
   // Alles andere direkt aus der Nachricht
   for (const { t, r, wer, art } of einzelne.splice(0)) {
     if (wer && wer === liveIch) continue
-    if (t === "termin") {
+    if (t === "lead_weg") {
+      // Ein Lead liegt jetzt im Papierkorb: hier ausblenden (das Update selbst kommt nicht mehr an, weil ihn niemand mehr sehen darf)
+      if (!leadsLokalEntfernen([r.lead_id])) continue
+    } else if (t === "termin") {
       const x = terminAus(r), i = M.TERMINE.findIndex((y: any) => y.id === x.id)
       if (i >= 0) Object.assign(M.TERMINE[i], x); else (M.TERMINE as any[]).push(x)
       merke("termin:" + x.id, terminZeile(x))
@@ -671,4 +674,74 @@ export async function akteTerminSpeichern(t: any) {
   const zeile = { id: t.id, mandat_id: mid(t.mandat), art: t.art, titel: t.titel, datum: t.datum, zeit: t.zeit || null, ort: t.ort || null, notiz: t.notiz || null, erledigt: !!t.erledigt, wer: t.wer || null }
   if (ECHT) { const { error } = await sb.from("mandat_termin").upsert(zeile); if (error) throw new Error(uebersetzen(error.message)) }
   const i = A.TERMINE.findIndex((x: any) => x.id === t.id); if (i >= 0) Object.assign(A.TERMINE[i], t); else (A.TERMINE as any[]).push(t)
+}
+
+/* ---------- Papierkorb (Leads) ----------
+   In den Papierkorb: Geschäftsführung (und die Claude-Verbindung). Wiederherstellen und endgültig löschen: nur Geschäftsführung.
+   Im Papierkorb sieht die Datenbank den Lead für niemanden mehr; nach 30 Tagen wird er nachts endgültig gelöscht. */
+export type PapierkorbEintrag = { id: string; name: string; ort: string | null; bereich: string; mandat: string | null; stufe: string; kontakte: number; geloescht_am: string; geloescht_von: string | null; endgueltig_am: string }
+
+/* Leads (mit ihren Terminen) aus dem Speicher der App nehmen. Gibt zurück, wie viele es waren. */
+export function leadsLokalEntfernen(ids: string[]) {
+  const weg = new Set(ids)
+  let n = 0
+  for (let i = M.LEADS.length - 1; i >= 0; i--) {
+    const l: any = M.LEADS[i]
+    if (!weg.has(l.id)) continue
+    M.LEADS.splice(i, 1); n++
+    gespeichert.delete("lead:" + l.id); gespeichert.delete("abschluss:" + l.id)
+    l.kontakte.forEach((k: any) => gespeichert.delete("kontakt:" + k.id))
+  }
+  for (let i = M.TERMINE.length - 1; i >= 0; i--) {
+    const t: any = M.TERMINE[i]
+    if (t.lead && weg.has(t.lead)) { M.TERMINE.splice(i, 1); gespeichert.delete("termin:" + t.id) }
+  }
+  return n
+}
+export async function leadsInPapierkorb(ids: string[]) {
+  const { data, error } = await sb.rpc("leads_in_papierkorb", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  leadsLokalEntfernen(ids)
+  return Number(data) || 0
+}
+export async function papierkorbLaden() {
+  const { data, error } = await sb.rpc("papierkorb_liste")
+  if (error) throw new Error(uebersetzen(error.message))
+  return (data || []) as PapierkorbEintrag[]
+}
+export async function leadsWiederherstellen(ids: string[]) {
+  const { data, error } = await sb.rpc("leads_wiederherstellen", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  await leadsHolen(ids)
+  return Number(data) || 0
+}
+export async function papierkorbEndgueltig(ids: string[]) {
+  const { data, error } = await sb.rpc("papierkorb_endgueltig", { p_ids: ids })
+  if (error) throw new Error(uebersetzen(error.message))
+  return Number(data) || 0
+}
+/* Wiederhergestellte Leads samt Terminen frisch holen und in die App übernehmen */
+async function leadsHolen(ids: string[]) {
+  if (!ids.length) return
+  const [{ data: ls, error: e1 }, { data: ts, error: e2 }] = await Promise.all([
+    sb.from("lead").select("*, kontakt(*), verlauf(*), abschluss(*)").in("id", ids),
+    sb.from("termin").select("*").in("lead_id", ids),
+  ])
+  if (e1) throw new Error(uebersetzen(e1.message))
+  if (e2) throw new Error(uebersetzen(e2.message))
+  for (const r of ls || []) {
+    if (!M.MANDATE.some((m: any) => m.id === String(r.mandat_id))) continue
+    const l: any = leadAus(r)
+    if (l.bereich === "standort") K.verorten(l)
+    const i = M.LEADS.findIndex((x: any) => x.id === l.id)
+    if (i >= 0) Object.assign(M.LEADS[i], l); else (M.LEADS as any[]).push(l)
+    merke("lead:" + l.id, leadZeile(l)); l.kontakte.forEach((k: any) => merke("kontakt:" + k.id, kontaktZeile(l, k)))
+    if (l.abschluss) merke("abschluss:" + l.id, abschlussZeile(l))
+  }
+  for (const r of ts || []) {
+    const t: any = terminAus(r)
+    const i = M.TERMINE.findIndex((x: any) => x.id === t.id)
+    if (i >= 0) Object.assign(M.TERMINE[i], t); else (M.TERMINE as any[]).push(t)
+    merke("termin:" + t.id, terminZeile(t))
+  }
 }
