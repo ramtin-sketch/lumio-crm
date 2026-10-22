@@ -75,7 +75,7 @@ function ErgebnisWerbung({ l, breit }: { l: any; breit?: boolean }) {
   const [tel2, setTel2] = React.useState("")
   const fertig = (erg: string, x?: any) => { toast(M.protokoll(l, ui.ich, erg, x)); setOffen(null); setText(""); setTel2(""); bump() }
   const auf = (o: Offen, vorbelegt = "") => { setText(vorbelegt); setTel2(""); setOffen(offen === o ? null : o) }
-  const inKontakt = ["recherche", "anrufversuch", "spaeter"].includes(l.stufe)
+  const inKontakt = ["recherche", "spaeter"].includes(l.stufe)
   const raster = "grid grid-cols-2 gap-2" + (breit ? " sm:grid-cols-4" : "")
   return (
     <div className="space-y-3">

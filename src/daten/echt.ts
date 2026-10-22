@@ -130,7 +130,7 @@ function leadAus(r: any) {
   return {
     id: r.id, mandat: String(r.mandat_id), bereich: r.bereich, name: r.name, ort: r.ort, adresse: r.adresse, stadt: r.stadt, unit: r.unit,
     geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
-    stufe: r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
+    stufe: r.stufe === "anrufversuch" ? "recherche" : r.stufe === "folgetermin" ? "termin" : r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
     next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
     felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0, versuche: r.versuche || 0,
     uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,

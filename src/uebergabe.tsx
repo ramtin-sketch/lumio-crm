@@ -175,18 +175,18 @@ export function UebergabeKarte({ l }: { l: any }) {
   if (!u) return null
   const budget = M.BUDGETS.find((b: any) => b[0] === u.budget)?.[1]
   const ent = M.ENTSCHEIDER.find((b: any) => b[0] === u.entscheider)?.[1]
-  const darfErgebnis = (l.stufe === "termin" || l.stufe === "folgetermin") && (ui.ich === (l.closer || u.an) || ui.istGF)
+  const darfErgebnis = l.stufe === "termin" && (ui.ich === (l.closer || u.an) || ui.istGF)
   const neu = M.istNeuesModell(l)
   const faellig = u.termin.datum <= M.HEUTE
   const selbst = u.von === u.an
   return (
-    <Card className={cn("gap-3 py-4", (l.stufe === "termin" || l.stufe === "folgetermin") && "border-cobalt/40 bg-cobalt/[0.03]")}>
+    <Card className={cn("gap-3 py-4", l.stufe === "termin" && "border-cobalt/40 bg-cobalt/[0.03]")}>
       <CardHeader className="px-4">
         <CardTitle className="flex items-center gap-2 text-sm">
           <PersonAvatar id={u.von} />{!selbst && <><ArrowRight className="size-3.5 text-muted-foreground" /><PersonAvatar id={u.an} /></>}
           <span>{selbst ? "Selbst gesetzt von " + M.person(u.von).name : "Übergabe von " + M.person(u.von).name + " an " + M.person(u.an).name}</span>
         </CardTitle>
-        <CardDescription>Termin {M.dKurz(u.termin.datum)}{u.termin.zeit ? " um " + u.termin.zeit : ""} · gesetzt am {M.dKurz(u.datum)}{l.stufe === "folgetermin" && l.next ? " · Folgetermin " + M.wann(l.next) : ""}</CardDescription>
+        <CardDescription>Termin {M.dKurz(u.termin.datum)}{u.termin.zeit ? " um " + u.termin.zeit : ""} · gesetzt am {M.dKurz(u.datum)}{l.stufe === "termin" && M.istFolgetermin(l) && l.next ? " · Folgetermin " + M.wann(l.next) : ""}</CardDescription>
         {l.terminStatus === "noshow" && <CardAction><Badge variant="outline" className="border-transparent bg-destructive/10 text-destructive">No-Show</Badge></CardAction>}
         {l.terminStatus === "gelaufen" && <CardAction><Badge variant="outline" className="border-transparent bg-ok/15 text-ok">gelaufen</Badge></CardAction>}
       </CardHeader>
