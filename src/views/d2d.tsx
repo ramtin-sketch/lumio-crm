@@ -83,7 +83,7 @@ export function D2D() {
 
         <TabsContent value="karte" className="space-y-4">
           <ToggleGroup type="single" variant="outline" size="sm" value={stadt} onValueChange={(v) => v && ui.setKartenStadt(v)} aria-label="Stadt" className="w-fit">
-            {K.STAEDTE.map((s: any) => <ToggleGroupItem key={s.id} value={s.id} className="px-3">{s.name}</ToggleGroupItem>)}
+            {K.STAEDTE_D2D.map((s: any) => <ToggleGroupItem key={s.id} value={s.id} className="px-3">{s.name}</ToggleGroupItem>)}
           </ToggleGroup>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
             <Card className="gap-0 overflow-hidden p-0">
