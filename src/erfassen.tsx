@@ -224,7 +224,7 @@ function Inhalt() {
             <Feld id="eb" label="Handelsvertreter">
               <NativeSelect id="eb" value={betreuer} onChange={(e) => setBetreuerWahl(e.target.value)} required>
                 <NativeSelectOption value="">bitte wählen</NativeSelectOption>
-                {M.PERSONEN.filter((p: any) => p.rolle === "hv").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}{p.id === owner ? " (Gebiet)" : ""}</NativeSelectOption>)}
+                {M.PERSONEN.filter((p: any) => p.rolle === "hv" || p.rolle === "gf").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}{p.id === owner ? " (Gebiet)" : ""}</NativeSelectOption>)}
               </NativeSelect>
             </Feld>
           )}

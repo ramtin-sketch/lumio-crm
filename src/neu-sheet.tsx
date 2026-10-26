@@ -99,8 +99,8 @@ export function NeuSheet() {
             <div className="grid grid-cols-2 gap-3">
               <Feld id="nst" label="Phase"><NativeSelect id="nst" name="stufe">{M.STUFEN[bereich].filter((s: any) => !s.ende).map((s: any) => <NativeSelectOption key={s.id} value={s.id}>{s.name}</NativeSelectOption>)}</NativeSelect></Feld>
               {gf && <Feld id="nbe" label={bereich !== "standort" ? "Betreut von" : "Handelsvertreter"}>
-                <NativeSelect id="nbe" name="betreuer" defaultValue={bereich !== "standort" ? ui.ich : "jonas"}>
-                  {M.PERSONEN.filter((p: any) => (bereich !== "standort" ? p.rolle !== "hv" : p.rolle === "hv")).map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
+                <NativeSelect id="nbe" name="betreuer" defaultValue={ui.ich}>
+                  {M.PERSONEN.filter((p: any) => (bereich !== "standort" ? p.rolle !== "hv" : p.rolle === "hv" || p.rolle === "gf")).map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
                 </NativeSelect></Feld>}
               <Feld id="nnd" label="Nächster Schritt am"><Input id="nnd" name="ndatum" type="date" defaultValue={M.tag(1)} /></Feld>
               <Feld id="nnt" label="Was"><Input id="nnt" name="ntext" placeholder={bereich !== "standort" ? "Erstanruf" : "Eigentümer ansprechen"} /></Feld>

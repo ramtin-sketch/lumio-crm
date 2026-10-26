@@ -49,7 +49,7 @@ function Inhalt({ l }: { l: any }) {
   const sperre = M.sperrTreffer(l)
   const kGesperrt = (k: any) => M.SPERRLISTE.some((e: any) => (k.tel && e.telefon === M.telNorm(k.tel)) || (k.mail && e.email === M.mailNorm(k.mail)))
   const aendern = (fn: () => void, msg?: string) => { fn(); bump(); if (msg) toast(msg) }
-  const gfs = M.PERSONEN.filter((p: any) => p.rolle === "gf"), innen = M.PERSONEN.filter((p: any) => p.rolle !== "hv"), hvs = M.PERSONEN.filter((p: any) => p.rolle === "hv")
+  const gfs = M.PERSONEN.filter((p: any) => p.rolle === "gf"), innen = M.PERSONEN.filter((p: any) => p.rolle !== "hv"), hvs = M.PERSONEN.filter((p: any) => p.rolle === "hv" || p.rolle === "gf")
 
   const form = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); return Object.fromEntries(new FormData(e.currentTarget).entries()) as Record<string, string> }
 
@@ -77,12 +77,12 @@ function Inhalt({ l }: { l: any }) {
             </NativeSelect>
           </Feld>
           {tel || gf ? (
-            <Feld id="dbe" label={tel ? "Betreut von" : "Handelsvertreter"}>
+            <Feld id="dbe" label="Betreut von">
               <NativeSelect id="dbe" value={l.betreuer} onChange={(e) => aendern(() => { l.betreuer = e.target.value; M.verlauf(l, ui.ich, "notiz", "Übergeben an " + M.person(e.target.value).name) })}>
                 {(tel ? innen : hvs).map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
               </NativeSelect>
             </Feld>
-          ) : <Feld id="x" label="Handelsvertreter"><div className="py-2 text-sm">{M.person(l.betreuer).voll}</div></Feld>}
+          ) : <Feld id="x" label="Betreut von"><div className="py-2 text-sm">{M.person(l.betreuer).voll}</div></Feld>}
           {tel && ["setter", "closer"].map((r) => (
             <Feld key={r} id={"d" + r} label={r === "setter" ? "Gesetzt von" : "Geclosed von"}>
               <NativeSelect id={"d" + r} value={l[r] || ""} onChange={(e) => aendern(() => { l[r] = e.target.value || null })}>

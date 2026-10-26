@@ -37,7 +37,7 @@ export function Karte() {
   else if (hv) ls = ls.filter((l: any) => l.betreuer === hv)
 
   const units = K.UNITS.filter((u: any) => u.stadt === stadt)
-  const leute = M.PERSONEN.filter((p: any) => p.rolle === "hv" && (p.stadt === stadt || units.some((u: any) => K.besitzer(u) === p.id)))
+  const leute = M.PERSONEN.filter((p: any) => (p.rolle === "hv" || p.rolle === "gf") && (p.stadt === stadt || units.some((u: any) => K.besitzer(u) === p.id)))
   const frei = units.filter((u: any) => !K.besitzer(u))
   const einheit = stadt === "kiel" ? ["Gebiet", "Gebiete"] : ["Stadtteil", "Stadtteile"]
   const fokusLead = ui.kartenFokus ? M.LEADS.find((l: any) => l.id === ui.kartenFokus) : null
@@ -67,7 +67,7 @@ export function Karte() {
         {gf && (
           <NativeSelect size="sm" value={ui.hvFilter} onChange={(e) => ui.setHvFilter(e.target.value)} aria-label="Vertriebler" className="w-auto min-w-40">
             <NativeSelectOption value="alle">Alle Vertriebler</NativeSelectOption>
-            {M.PERSONEN.filter((p: any) => p.rolle === "hv").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
+            {M.PERSONEN.filter((p: any) => p.rolle === "hv" || p.rolle === "gf").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
           </NativeSelect>
         )}
         <span className="text-sm text-muted-foreground tabular">{M.plural(ls.length, "Standort", "Standorte")}</span>
@@ -105,7 +105,7 @@ export function Karte() {
                 <label className="grid gap-1.5 text-xs text-muted-foreground">Gebiet gehört zu
                   <NativeSelect value={K.besitzer(gewaehlt) || ""} onChange={(e) => { toast(K.zuweisen(gewaehlt.id, e.target.value || null, ui.ich)); bump() }}>
                     <NativeSelectOption value="">frei, niemand</NativeSelectOption>
-                    {M.PERSONEN.filter((p: any) => p.rolle === "hv").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
+                    {M.PERSONEN.filter((p: any) => p.rolle === "hv" || p.rolle === "gf").map((p: any) => <NativeSelectOption key={p.id} value={p.id}>{p.voll}</NativeSelectOption>)}
                   </NativeSelect>
                 </label>
               </CardContent>

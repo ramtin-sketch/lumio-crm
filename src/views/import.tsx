@@ -141,7 +141,7 @@ function LeadImport({ bereich, setBereich }: { bereich: string; setBereich: (b: 
   const ui = useUI()
   const mandate = M.MANDATE.filter((m: any) => m.bereich === bereich && m.status !== "beendet")
   const [mandat, setMandat] = React.useState<string>("")
-  const leute = M.PERSONEN.filter((p: any) => p.aktiv !== false && (bereich === "standort" ? p.rolle === "hv" : p.rolle !== "hv"))
+  const leute = M.PERSONEN.filter((p: any) => p.aktiv !== false && (bereich === "standort" ? p.rolle === "hv" || p.rolle === "gf" : p.rolle !== "hv"))
   const [betreuer, setBetreuer] = React.useState<string>(ui.ich)
   const [text, setText] = React.useState("")
   const [zuordnung, setZuordnung] = React.useState<Record<string, number>>({})
