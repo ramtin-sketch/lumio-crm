@@ -48,9 +48,9 @@ export function Karte() {
   return (
     <>
       <Seitenkopf titel={gf ? "Karte" : "Mein Gebiet"} text={gf ? "Wer wo unterwegs ist, welche Stadtteile frei sind und wo die Standorte liegen." : "Dein Gebiet und deine Standorte. Vor Ort einfach auf „Standort hier erfassen“ tippen."}>
-        <ToggleGroup type="single" variant="outline" size="sm" value={stadt} onValueChange={(v) => v && ui.setKartenStadt(v)} aria-label="Stadt">
-          {K.STAEDTE.map((s: any) => <ToggleGroupItem key={s.id} value={s.id} className="px-3">{s.name}</ToggleGroupItem>)}
-        </ToggleGroup>
+        <NativeSelect value={stadt} onChange={(e) => ui.setKartenStadt(e.target.value)} aria-label="Stadt" className="w-40">
+          {K.STAEDTE.map((s: any) => <NativeSelectOption key={s.id} value={s.id}>{s.name}</NativeSelectOption>)}
+        </NativeSelect>
         <Button size="sm" onClick={() => ui.setErfassen(true)}><LocateFixed />Standort hier erfassen</Button>
       </Seitenkopf>
 

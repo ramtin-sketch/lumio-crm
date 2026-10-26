@@ -6,8 +6,16 @@ import * as M from './model.js';
 export const STAEDTE = [
   { id: 'hamburg', name: 'Hamburg' },
   { id: 'berlin', name: 'Berlin' },
-  { id: 'kiel', name: 'Kiel' }
+  { id: 'kiel', name: 'Kiel' },
+  { id: 'potsdam', name: 'Potsdam' },
+  { id: 'leipzig', name: 'Leipzig' },
+  { id: 'dresden', name: 'Dresden' },
+  { id: 'halle', name: 'Halle (Saale)' },
+  { id: 'jena', name: 'Jena' },
+  { id: 'chemnitz', name: 'Chemnitz' }
 ];
+/* Door-to-Door gibt es nur in diesen Städten */
+export const STAEDTE_D2D = STAEDTE.filter(s => ['hamburg', 'berlin', 'kiel'].includes(s.id));
 
 /* ---------- Gebietsbausteine ---------- */
 const KIEL_UMLAND = u => u.stadt === 'kiel' && u.name !== 'Kiel';
@@ -96,7 +104,7 @@ function punktFuerOrt(ort, rnd){
 /* Alle Standort-Leads bekommen Koordinaten, Stadt und Gebietsbaustein */
 export function verorten(l){
   if (!l.geo && !M.MODUS.echt){ const p = punktFuerOrt(l.ort, RK); if (p) l.geo = p; }
-  if (l.geo){ const u = unitAt(l.geo.lat, l.geo.lng); l.unit = u ? u.id : null; l.stadt = u ? u.stadt : null; }
+  if (l.geo){ const u = unitAt(l.geo.lat, l.geo.lng); l.unit = u ? u.id : null; l.stadt = u ? u.stadt : (l.stadt || null); }
 }
 M.LEADS.filter(l => l.bereich === 'standort').forEach(verorten);
 
@@ -185,3 +193,4 @@ export function standortAnlegen(o, wer){
 
 export const googleLink = p => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
 export const routeLink = p => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+export const appleLink = p => `https://maps.apple.com/?daddr=${p.lat},${p.lng}`;
