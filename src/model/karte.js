@@ -192,5 +192,8 @@ export function standortAnlegen(o, wer){
 }
 
 export const googleLink = p => `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
-export const routeLink = p => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
-export const appleLink = p => `https://maps.apple.com/?daddr=${p.lat},${p.lng}`;
+/* Ziel für die Navigation: Name und Adresse, wenn bekannt. Reine Koordinaten führen Google und Apple
+   sonst zum nächstgelegenen eingetragenen Ort im selben Haus (z. B. Kita statt Café). */
+const zielText = (p, name, adresse) => adresse ? (name ? name + ', ' : '') + adresse : `${p.lat},${p.lng}`;
+export const routeLink = (p, name, adresse) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(zielText(p, name, adresse))}`;
+export const appleLink = (p, name, adresse) => `https://maps.apple.com/?daddr=${encodeURIComponent(zielText(p, name, adresse))}`;

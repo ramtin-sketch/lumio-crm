@@ -61,7 +61,7 @@ function Inhalt({ o }: { o: any }) {
           <PersonAvatar id={o.betreuer} />
         </div>
         <div className="flex flex-wrap gap-2">
-          {o.geo && <Button asChild variant="outline" size="sm"><a href={K.routeLink(o.geo)} target="_blank" rel="noreferrer"><Navigation />Route</a></Button>}
+          {o.geo && <Button asChild variant="outline" size="sm"><a href={K.routeLink(o.geo, "", [o.strasse, o.hausnr].filter(Boolean).join(" ") + (o.ort ? ", " + [o.plz, o.ort].filter(Boolean).join(" ") : ""))} target="_blank" rel="noreferrer"><Navigation />Route</a></Button>}
           <Button variant="outline" size="sm" onClick={() => { D.wohnungDazu(o); bump() }}><Plus />Wohnung</Button>
         </div>
         {!freigabe && (
