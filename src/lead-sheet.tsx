@@ -118,8 +118,8 @@ function Inhalt({ l }: { l: any }) {
               </div>
               <div className="flex gap-1.5">
                 <Button variant="outline" size="xs" onClick={() => ui.zeigeAufKarte(l.id)}><MapIcon />Karte</Button>
-                <Button asChild variant="outline" size="xs"><a href={K.routeLink(l.geo)} target="_blank" rel="noreferrer"><Navigation />Google Maps</a></Button>
-                <Button asChild variant="outline" size="xs"><a href={K.appleLink(l.geo)} target="_blank" rel="noreferrer"><Navigation />Apple Karten</a></Button>
+                <Button asChild variant="outline" size="xs"><a href={K.routeLink(l.geo, l.name, l.adresse)} target="_blank" rel="noreferrer"><Navigation />Google Maps</a></Button>
+                <Button asChild variant="outline" size="xs"><a href={K.appleLink(l.geo, l.name, l.adresse)} target="_blank" rel="noreferrer"><Navigation />Apple Karten</a></Button>
               </div>
             </div>
           </div>
