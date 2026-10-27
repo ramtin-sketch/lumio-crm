@@ -13,7 +13,7 @@ export function PasswortFormular({ pflicht, onFertig }: { pflicht?: boolean; onF
   return (
     <form className="grid gap-4" onSubmit={async (e) => {
       e.preventDefault(); setFehler(null)
-      if (a.length < 8) return setFehler("Mindestens 8 Zeichen.")
+      if (a.length < 12) return setFehler("Mindestens 12 Zeichen.")
       if (a !== b) return setFehler("Die beiden Passwörter sind nicht gleich.")
       setLaeuft(true)
       try { await passwortAendern(a); onFertig() } catch (x: any) { setFehler(x.message) } finally { setLaeuft(false) }
