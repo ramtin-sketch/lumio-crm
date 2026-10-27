@@ -19,7 +19,7 @@ const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const RUECKRUF = `${SUPABASE_URL}/functions/v1/google-kalender/rueckruf`;
 const ZONE = "Europe/Berlin";
 const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy",
-  "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"];
+  "https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.send"];
 const ZIEL_ROLLEN = ["gf", "closer"]; // in deren Kalender dürfen Closing-Termine eingetragen werden
 
 const CORS = {
@@ -91,6 +91,42 @@ function b64(t: string) {
 const kodiert = (t: string) => /^[\x20-\x7e]*$/.test(t) ? t : `=?UTF-8?B?${b64(t)}?=`;
 const b64url = (t: string) => b64(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 function zeilenUmbruch(t: string) { return b64(t).replace(/.{1,76}/g, (x) => x + "\r\n") }
+function ausB64url(t: string) {
+  const bin = atob(t.replace(/-/g, "+").replace(/_/g, "/"));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+const adressenIn = (x: string) => (x.match(/[^\s<>"(),;:]+@[^\s<>"(),;:]+\.[^\s<>"(),;:]+/g) || []).map((a) => a.toLowerCase());
+function ohneHtml(h: string) {
+  return h.replace(/<(style|script)[\s\S]*?<\/\1>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|tr|li|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+function inhalt(teil: any): { text: string; html: string; anhaenge: string[] } {
+  const r = { text: "", html: "", anhaenge: [] as string[] };
+  const geh = (t: any) => {
+    if (!t) return;
+    if (t.filename) { r.anhaenge.push(t.filename); return; }
+    if (t.mimeType === "text/plain" && t.body?.data && !r.text) r.text = ausB64url(t.body.data);
+    else if (t.mimeType === "text/html" && t.body?.data && !r.html) r.html = ausB64url(t.body.data);
+    (t.parts || []).forEach(geh);
+  };
+  geh(teil);
+  return r;
+}
+function verlaufKurz(d: any, email: string) {
+  const msgs = d.messages || [], erste = msgs[0] || {}, letzte = msgs[msgs.length - 1] || {};
+  const alle = new Set<string>();
+  msgs.forEach((m: any) => ["From", "To", "Cc"].forEach((k) => adressenIn(kopf(m, k)).forEach((a) => alle.add(a))));
+  alle.delete(email.toLowerCase());
+  return {
+    id: d.id, betreff: kopf(erste, "Subject") || "(ohne Betreff)", von: kopf(letzte, "From"), an: kopf(letzte, "To"),
+    datum: letzte.internalDate ? new Date(Number(letzte.internalDate)).toISOString() : null,
+    auszug: letzte.snippet || "", anzahl: msgs.length, ungelesen: msgs.some((m: any) => (m.labelIds || []).includes("UNREAD")),
+    gesendet: (letzte.labelIds || []).includes("SENT"), adressen: [...alle].slice(0, 20),
+    link: `https://mail.google.com/mail/?authuser=${encodeURIComponent(email)}#all/${d.id}`,
+  };
+}
+const META = "format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Date";
 
 /* ---------- Wer fragt? ---------- */
 async function anrufer(req: Request) {
@@ -255,19 +291,47 @@ async function aktion(ich: { id: string; name: string; rolle: string }, b: any) 
       const teil = adressen.map((a: string) => `"${a}"`).join(" OR ");
       const q = new URLSearchParams({ q: `{from:(${teil}) to:(${teil}) cc:(${teil})}`, maxResults: "15" });
       const liste = await gmail(ich.id, `/threads?${q}`);
-      const verlaeufe = await Promise.all((liste.threads || []).map(async (t: any) => {
-        const d = await gmail(ich.id, `/threads/${t.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`);
-        const msgs = d.messages || [], erste = msgs[0] || {}, letzte = msgs[msgs.length - 1] || {};
-        return {
-          id: t.id, betreff: kopf(erste, "Subject") || "(ohne Betreff)", von: kopf(letzte, "From"), an: kopf(letzte, "To"),
-          datum: letzte.internalDate ? new Date(Number(letzte.internalDate)).toISOString() : null,
-          auszug: letzte.snippet || "", anzahl: msgs.length, ungelesen: msgs.some((m: any) => (m.labelIds || []).includes("UNREAD")),
-          gesendet: (letzte.labelIds || []).includes("SENT"),
-          link: `https://mail.google.com/mail/?authuser=${encodeURIComponent(v.google_email)}#all/${t.id}`,
-        };
-      }));
+      const verlaeufe = await Promise.all((liste.threads || []).map(async (t: any) => verlaufKurz(await gmail(ich.id, `/threads/${t.id}?${META}`), v.google_email)));
       verlaeufe.sort((a: any, z: any) => String(z.datum).localeCompare(String(a.datum)));
       return { verbunden: true, email: v.google_email, verlaeufe };
+    }
+    case "postfach": {
+      // Posteingang, Gesendet oder Suche im eigenen Postfach
+      const v = (await team()).find((p: any) => p.id === ich.id);
+      if (!v?.google_email) return { verbunden: false, verlaeufe: [] };
+      const ordner = b.ordner === "gesendet" ? "in:sent" : b.ordner === "alle" ? "" : "in:inbox";
+      const suche = String(b.suche || "").replace(/[{}]/g, " ").trim().slice(0, 200);
+      const q = new URLSearchParams({ maxResults: "25" });
+      const qq = [ordner, suche].filter(Boolean).join(" ");
+      if (qq) q.set("q", qq);
+      if (b.seite) q.set("pageToken", String(b.seite));
+      const [liste, eingang] = await Promise.all([gmail(ich.id, `/threads?${q}`), gmail(ich.id, "/labels/INBOX").catch(() => null)]);
+      const verlaeufe = await Promise.all((liste.threads || []).map(async (t: any) => verlaufKurz(await gmail(ich.id, `/threads/${t.id}?${META}`), v.google_email)));
+      return { verbunden: true, email: v.google_email, verlaeufe, weiter: liste.nextPageToken || null, ungelesen: eingang?.threadsUnread ?? null };
+    }
+    case "ungelesen": {
+      const v = (await team()).find((p: any) => p.id === ich.id);
+      if (!v?.google_email) return { verbunden: false, ungelesen: 0 };
+      const l = await gmail(ich.id, "/labels/INBOX").catch(() => null);
+      return { verbunden: true, ungelesen: l?.threadsUnread ?? 0 };
+    }
+    case "verlauf": {
+      // Eine Unterhaltung vollständig lesen; danach als gelesen markieren
+      const v = (await team()).find((p: any) => p.id === ich.id);
+      if (!v?.google_email) throw new Fehler("Verbinde zuerst Google unter „Kalender“.", 409);
+      if (!/^[0-9a-f]{6,32}$/i.test(String(b.id || ""))) throw new Fehler("Unbekannte Unterhaltung.");
+      const d = await gmail(ich.id, `/threads/${b.id}?format=full`);
+      const nachrichten = (d.messages || []).map((m: any) => {
+        const x = inhalt(m.payload);
+        return {
+          id: m.id, von: kopf(m, "From"), an: kopf(m, "To"), cc: kopf(m, "Cc"), datum: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : null,
+          text: (x.text || ohneHtml(x.html) || m.snippet || "").slice(0, 30000), anhaenge: x.anhaenge, kennung: kopf(m, "Message-ID") || kopf(m, "Message-Id"),
+          gesendet: (m.labelIds || []).includes("SENT"),
+        };
+      });
+      if ((d.messages || []).some((m: any) => (m.labelIds || []).includes("UNREAD")))
+        await gmail(ich.id, `/threads/${b.id}/modify`, { method: "POST", body: JSON.stringify({ removeLabelIds: ["UNREAD"] }) }).catch(() => null);
+      return { ...verlaufKurz(d, v.google_email), ungelesen: false, nachrichten };
     }
     case "senden": {
       // Wird nur durch einen Klick der Person in der App ausgelöst; Absender ist immer das eigene Postfach
@@ -281,9 +345,11 @@ async function aktion(ich: { id: string; name: string; rolle: string }, b: any) 
       if (!betreff || !text.trim()) throw new Fehler("Betreff und Text dürfen nicht leer sein.");
       const roh = [
         `From: ${kodiert(ich.name)} <${v.google_email}>`, `To: ${an}`, `Subject: ${kodiert(betreff)}`,
+        ...(/^<[^<>\s]+>$/.test(String(b.antwortAuf || "")) ? [`In-Reply-To: ${b.antwortAuf}`, `References: ${b.antwortAuf}`] : []),
         "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", zeilenUmbruch(text),
       ].join("\r\n");
-      const d = await gmail(ich.id, "/messages/send", { method: "POST", body: JSON.stringify({ raw: b64url(roh), threadId: b.verlauf || undefined }) });
+      const verlauf = /^[0-9a-f]{6,32}$/i.test(String(b.verlauf || "")) ? String(b.verlauf) : undefined;
+      const d = await gmail(ich.id, "/messages/send", { method: "POST", body: JSON.stringify({ raw: b64url(roh), threadId: verlauf }) });
       return { id: d.id, verlauf: d.threadId };
     }
   }

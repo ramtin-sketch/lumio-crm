@@ -12,12 +12,13 @@ import * as M from "@/model/model.js"
 import * as D from "@/model/d2d.js"
 import { abmelden, ueberallAbmelden, zweifaktorStand, hinweiseLaden } from "@/daten/echt"
 import { ZweifaktorEinrichten } from "@/zweifaktor"
+import { aufPostfach, ungelesenZahl } from "@/daten/gmail"
 import { Button } from "@/components/ui/button"
 import { PasswortFormular } from "@/passwort"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
-  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check, Trash2,
+  ArrowRightLeft, Building2, DoorOpen, FileSpreadsheet, GraduationCap, KeyRound, LogOut, Smartphone, MonitorSmartphone, Loader2, CheckCircle2, Map as MapIcon, ShieldCheck, CalendarCheck, CalendarDays, ChevronsUpDown, LayoutDashboard, MapPin, Megaphone, Moon, Phone, Sun, Users, Wallet, Check, Trash2, Inbox,
 } from "lucide-react"
 
 type Punkt = { id: Ansicht; titel: string; icon: any; zahl?: number }
@@ -47,11 +48,23 @@ export function AppSidebar() {
     return () => { window.removeEventListener("lumio-hinweise-gesehen", zaehlen); clearInterval(t) }
   }, [ui.echt, ui.istGF])
 
+  // Ungelesene E-Mails im Gmail-Eingang (nur wenn Google verbunden ist)
+  const [ungelesen, setUngelesen] = React.useState(0)
+  React.useEffect(() => {
+    const zaehlen = () => ungelesenZahl().then(setUngelesen).catch(() => {})
+    zaehlen()
+    const weg = aufPostfach(zaehlen)
+    const t = setInterval(zaehlen, 5 * 60000)
+    return () => { weg(); clearInterval(t) }
+  }, [ui.ich])
+  const post: Punkt = { id: "postfach", titel: "Postfach", icon: Inbox, zahl: ungelesen }
+
   const gruppen: { label: string; punkte: Punkt[] }[] = ui.istGF
     ? [
         { label: "Übersicht", punkte: [
           { id: "heute", titel: "Heute", icon: CalendarCheck, zahl: faelligHeute },
           { id: "dashboard", titel: "Dashboard", icon: LayoutDashboard },
+          post,
           { id: "kalender", titel: "Kalender", icon: CalendarDays },
         ] },
         { label: "Vertrieb", punkte: [
@@ -76,6 +89,7 @@ export function AppSidebar() {
           { id: "heute", titel: "Heute", icon: CalendarCheck, zahl: faelligHeute },
           { id: "anrufen", titel: "Anrufen", icon: Phone, zahl: anrufListe },
           { id: "termine", titel: "Meine Termine", icon: ArrowRightLeft, zahl: neuTerminieren },
+          post,
           { id: "kalender", titel: "Kalender", icon: CalendarDays },
         ] },
       ]
@@ -85,6 +99,7 @@ export function AppSidebar() {
           { id: "karte", titel: "Mein Gebiet", icon: MapIcon },
           { id: "standort", titel: "Meine Standorte", icon: MapPin },
           ...(ich.d2d?.freigaben?.length || D.OBJEKTE.some((o: any) => o.betreuer === ui.ich) ? [{ id: "d2d" as Ansicht, titel: "Door-to-Door", icon: DoorOpen }] : []),
+          post,
           { id: "kalender", titel: "Kalender", icon: CalendarDays },
           { id: "verdienst", titel: "Mein Verdienst", icon: Wallet },
         ] },
