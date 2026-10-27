@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import * as M from "@/model/model.js"
 import * as K from "@/model/karte.js"
 import { toast } from "sonner"
+import { VorOrtCheck, fotoLesen } from "@/vor-ort-check"
 import { AlertTriangle, Camera, CheckCircle2, Link2, Loader2, LocateFixed, MapPin, X } from "lucide-react"
 
 export function ErfassenSheet() {
@@ -30,26 +31,6 @@ export function ErfassenSheet() {
 
 function Feld({ id, label, children, className }: { id: string; label: string; children: React.ReactNode; className?: string }) {
   return <div className={cn("grid gap-1.5", className)}><Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>{children}</div>
-}
-
-/* Foto verkleinern, damit es schnell hochgeht */
-function fotoLesen(f: File): Promise<string> {
-  return new Promise((ok, fehler) => {
-    const r = new FileReader()
-    r.onerror = fehler
-    r.onload = () => {
-      const img = new Image()
-      img.onerror = () => ok(String(r.result))
-      img.onload = () => {
-        const s = Math.min(1, 1024 / Math.max(img.width, img.height))
-        const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s)
-        c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height)
-        ok(c.toDataURL("image/jpeg", 0.8))
-      }
-      img.src = String(r.result)
-    }
-    r.readAsDataURL(f)
-  })
 }
 
 type Pos = { lat: number; lng: number; genau?: number | null }
@@ -74,6 +55,7 @@ function Inhalt() {
   const [ktel, setKtel] = React.useState("")
   const [notiz, setNotiz] = React.useState("")
   const [fotos, setFotos] = React.useState<string[]>([])
+  const [vorOrt, setVorOrt] = React.useState<any>({})
   const [betreuerWahl, setBetreuerWahl] = React.useState("")
   const fotoInput = React.useRef<HTMLInputElement>(null)
 
@@ -132,7 +114,7 @@ function Inhalt() {
     const l = K.standortAnlegen({
       mandat, name: name.trim(), adresse: adresse.trim(), stufe, betreuer, geo: { lat: pos.lat, lng: pos.lng }, fotos,
       kontakt: kname.trim() ? { name: kname.trim(), funktion: null, tel: ktel.trim() || null, mail: null } : null,
-      quelle, genau: pos.genau, notiz: notiz.trim(),
+      quelle, genau: pos.genau, notiz: notiz.trim(), vorOrt: stufe === "eigentuemer" ? vorOrt : {},
     }, ui.ich)
     bump(); ui.setErfassen(false)
     toast(`„${l.name}“ ist erfasst`, { description: (l.ort ? l.ort + " · " : "") + M.mandat(l.mandat).name, action: { label: "Öffnen", onClick: () => ui.oeffne(l.id) } })
@@ -241,9 +223,15 @@ function Inhalt() {
               <Feld id="et" label="Telefon"><Input id="et" type="tel" value={ktel} onChange={(e) => setKtel(e.target.value)} placeholder="+49 …" /></Feld>
             </div>
           )}
+          {stufe === "eigentuemer" && (
+            <div className="grid gap-1.5">
+              <span className="text-xs text-muted-foreground">Vor-Ort-Check · was du schon weißt, gleich abhaken</span>
+              <VorOrtCheck v={vorOrt} m={M.mandat(mandat)} onSet={(k, x) => setVorOrt((v: any) => ({ ...v, [k]: x }))} />
+            </div>
+          )}
           <Feld id="ez" label="Notiz"><Textarea id="ez" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Strom liegt an, Fläche neben dem Eingang" className="min-h-16" /></Feld>
           <div className="grid gap-1.5">
-            <span className="text-xs text-muted-foreground">Fotos</span>
+            <span className="text-xs text-muted-foreground">{stufe === "eigentuemer" ? "Weitere Fotos" : "Fotos"}</span>
             <div className="flex flex-wrap gap-2">
               {fotos.map((f, i) => (
                 <div key={i} className="relative size-20 overflow-hidden rounded-lg border">

@@ -141,7 +141,7 @@ const SYSTEM_PERSONEN = [];
 function person(id){ return PERSONEN.find(p => p.id === id) || SYSTEM_PERSONEN.find(p => p.id === id) || null; }
 function lead(o){
   const l = Object.assign({
-    id: neueId(), felder: {}, kontakte: [], verlauf: [], next: null, temp: 0, versuche: 0,
+    id: neueId(), felder: {}, vorOrt: {}, kontakte: [], verlauf: [], next: null, temp: 0, versuche: 0,
     setter: null, closer: null, betreuer: null, abschluss: null, verlustgrund: null, angelegt: tag(-12)
   }, o);
   l.bereich = mandat(l.mandat).bereich;

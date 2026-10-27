@@ -132,7 +132,7 @@ function leadAus(r: any) {
     geo: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
     stufe: r.stufe === "anrufversuch" ? "recherche" : r.stufe === "folgetermin" ? "termin" : r.stufe, temp: r.temp, betreuer: r.betreuer_id, setter: r.setter_id, closer: r.closer_id,
     next: r.next_datum ? { datum: r.next_datum, zeit: r.next_zeit, text: r.next_text || "" } : null,
-    felder: r.felder || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0, versuche: r.versuche || 0,
+    felder: r.felder || {}, vorOrt: r.vor_ort || {}, verlustgrund: r.verlustgrund, terminStatus: r.termin_status, noShows: r.no_shows || 0, versuche: r.versuche || 0,
     uebergabe: r.uebergabe, erfasst: r.erfasst, fotos: r.fotos || [], angelegt: r.angelegt, quelle: r.quelle,
     kontakte: (r.kontakt || []).sort((a: any, b: any) => a.erstellt_am.localeCompare(b.erstellt_am))
       .map((k: any) => ({ id: k.id, name: k.name, funktion: k.funktion, tel: k.telefon, mail: k.email, notiz: k.notiz })),
@@ -165,8 +165,10 @@ const leadZeile = (l: any) => ({
   next_datum: l.next?.datum || null, next_zeit: l.next?.zeit || null, next_text: l.next?.text || null,
   felder: l.felder || {}, verlustgrund: l.verlustgrund || null, termin_status: l.terminStatus || null, no_shows: l.noShows || 0, versuche: l.versuche || 0,
   uebergabe: l.uebergabe || null, erfasst: l.erfasst || null, fotos: (l.fotos || []).filter((f: string) => !f.startsWith("data:")),
-  quelle: l.quelle || null, angelegt: l.angelegt || M.HEUTE,
+  vor_ort: vorOrtZeile(l.vorOrt), quelle: l.quelle || null, angelegt: l.angelegt || M.HEUTE,
 })
+/* Fotos im Vor-Ort-Check gehen erst nach dem Hochladen als Pfad in die Datenbank */
+const vorOrtZeile = (v: any) => Object.fromEntries(Object.entries(v || {}).filter(([, x]) => !(typeof x === "string" && x.startsWith("data:"))))
 const kontaktZeile = (l: any, k: any) => ({ id: k.id, lead_id: l.id, name: k.name, funktion: k.funktion || null, telefon: k.tel || null, email: k.mail || null, notiz: k.notiz || null })
 const abschlussZeile = (l: any) => {
   const a = l.abschluss
@@ -182,18 +184,23 @@ const auftragZeile = (a: any) => ({ id: a.id, objekt_id: a.objekt || null, wohnu
   partner_nr: a.partnerNr || null, provision: a.provision ?? null, ausgezahlt: !!a.ausgezahlt, notiz: a.notiz || null })
 
 /* ---------- Fotos ---------- */
+async function fotoHoch(l: any, f: string) {
+  const blob = await (await fetch(f)).blob()
+  const pfad = `${l.id}/${crypto.randomUUID()}.jpg`
+  const { error } = await sb.storage.from("fotos").upload(pfad, blob, { contentType: blob.type || "image/jpeg" })
+  if (error) throw new Error("Foto: " + error.message)
+  fotoCache.set(pfad, f)
+  return pfad
+}
 async function fotosHochladen(l: any) {
-  const neu = (l.fotos || []).filter((f: string) => f.startsWith("data:"))
-  if (!neu.length) return false
-  const pfade: string[] = []
-  for (const f of neu) {
-    const blob = await (await fetch(f)).blob()
-    const pfad = `${l.id}/${crypto.randomUUID()}.jpg`
-    const { error } = await sb.storage.from("fotos").upload(pfad, blob, { contentType: blob.type || "image/jpeg" })
-    if (error) throw new Error("Foto: " + error.message)
-    fotoCache.set(pfad, f)
-    pfade.push(pfad)
+  let geaendert = false
+  for (const [k, x] of Object.entries(l.vorOrt || {})) {
+    if (typeof x === "string" && x.startsWith("data:")) { l.vorOrt = { ...l.vorOrt, [k]: await fotoHoch(l, x) }; geaendert = true }
   }
+  const neu = (l.fotos || []).filter((f: string) => f.startsWith("data:"))
+  if (!neu.length) return geaendert
+  const pfade: string[] = []
+  for (const f of neu) pfade.push(await fotoHoch(l, f))
   l.fotos = (l.fotos || []).filter((f: string) => !f.startsWith("data:")).concat(pfade)
   return true
 }
@@ -234,7 +241,7 @@ async function flush() {
     for (const l of M.LEADS as any[]) {
       if (await fotosHochladen(l)) {
         const z = leadZeile(l)
-        const { error } = await sb.from("lead").update({ fotos: z.fotos }).eq("id", l.id)
+        const { error } = await sb.from("lead").update({ fotos: z.fotos, vor_ort: z.vor_ort }).eq("id", l.id)
         if (error) throw new Error(error.message)
         merke("lead:" + l.id, z)
       }

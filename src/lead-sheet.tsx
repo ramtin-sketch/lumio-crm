@@ -16,6 +16,8 @@ import { bump, neuZeichnen, useDaten, useUI } from "@/store"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
 import { PapierkorbDialog } from "@/papierkorb-dialog"
+import { VorOrtCheck } from "@/vor-ort-check"
+import * as V from "@/model/vorort.js"
 import { Map as MapIcon, Mail, Navigation, Phone, ShieldBan, Trash2, UserPlus } from "lucide-react"
 
 function Abschnitt({ titel, children }: { titel: string; children: React.ReactNode }) {
@@ -71,6 +73,10 @@ function Inhalt({ l }: { l: any }) {
             <NativeSelect id="dst" value={l.stufe} onChange={(e) => {
               const v = e.target.value
               if (v === "gewonnen") { setAbschlussAuf(true); toast("Erst die Eckdaten eintragen, dann ist es gewonnen."); return }
+              if (l.bereich === "standort" && V.PRUEF_STUFEN.includes(v)) {
+                const st = V.stand(l, m)
+                if (st.offen.length) toast("Vor-Ort-Check noch nicht vollständig", { description: "Offen: " + st.offen.map((p: any) => p.text.replace(/\?$/, "")).join(", ") })
+              }
               aendern(() => { l.stufe = v; if (v === "verloren") { l.next = null; M.verlustAufTermin(l) } M.verlauf(l, ui.ich, "stufe", "Phase: " + M.stufeVon(l).name) })
             }}>
               {M.STUFEN[l.bereich].map((s: any) => <NativeSelectOption key={s.id} value={s.id} disabled={s.id === "gewonnen" && !gf}>{s.name}{s.id === "gewonnen" && !gf ? " (trägt GF ein)" : ""}</NativeSelectOption>)}
@@ -180,6 +186,16 @@ function Inhalt({ l }: { l: any }) {
           </>
         )}
 
+        {l.bereich === "standort" && (
+          <Abschnitt titel="Vor-Ort-Check">
+            <VorOrtCheck v={l.vorOrt} m={m} onSet={(k, x) => aendern(() => {
+              const vorher = V.stand(l, m).offen.length
+              l.vorOrt = { ...(l.vorOrt || {}), [k]: x }
+              if (vorher > 0 && V.stand(l, m).offen.length === 0) M.verlauf(l, ui.ich, "notiz", "Vor-Ort-Check vollständig")
+            })} />
+          </Abschnitt>
+        )}
+
         <Abschnitt titel="Angaben">
           <form className="space-y-3" onSubmit={(e) => { const w = form(e); aendern(() => { m.felder.forEach((f: any) => { l.felder[f.key] = w[f.key] || "" }) }, "Angaben gespeichert") }}>
             <div className="grid grid-cols-2 gap-3">
@@ -239,13 +255,13 @@ function Inhalt({ l }: { l: any }) {
             <PapierkorbDialog leads={[l]} offen={korbAuf} onOffen={setKorbAuf} />
             {l.name === "[gelöscht]" || !loeschAuf ? null : (
               <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-                <p className="text-sm">Name, Adresse, Ansprechpartner, Fotos und Notizen werden unwiderruflich überschrieben. Zahlen für Umsatz und Provision bleiben ohne Namen erhalten.</p>
+                <p className="text-sm">Name, Adresse, Ansprechpartner, Fotos, Vor-Ort-Check und Notizen werden unwiderruflich überschrieben. Zahlen für Umsatz und Provision bleiben ohne Namen erhalten.</p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="destructive" onClick={async () => {
                     try {
                       if (ui.echt) await anonymisieren("lead", l.id, "Löschung auf Anfrage")
                       l.kontakte.forEach((k: any) => Object.assign(k, { name: "[gelöscht]", funktion: null, tel: null, mail: null, notiz: null }))
-                      Object.assign(l, { name: "[gelöscht]", adresse: null, felder: {}, fotos: [], uebergabe: null, erfasst: null, geo: null, next: null })
+                      Object.assign(l, { name: "[gelöscht]", adresse: null, felder: {}, vorOrt: {}, fotos: [], uebergabe: null, erfasst: null, geo: null, next: null })
                       if (l.stufe !== "gewonnen") { l.stufe = "verloren"; l.verlustgrund = l.verlustgrund || "Löschung auf Anfrage" }
                       l.verlauf.forEach((v: any) => { v.text = null })
                       neuZeichnen(); setLoeschAuf(false); toast("Daten gelöscht")

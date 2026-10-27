@@ -180,7 +180,7 @@ export function standortAnlegen(o, wer){
   const u = unitAt(o.geo.lat, o.geo.lng);
   const l = M.neuerLead({
     mandat: o.mandat, name: o.name, ort: u ? u.name : (o.ort || null), adresse: o.adresse || null, stufe: o.stufe || 'recherche',
-    betreuer: o.betreuer, angelegt: M.HEUTE, geo: o.geo, fotos: o.fotos || [],
+    betreuer: o.betreuer, angelegt: M.HEUTE, geo: o.geo, fotos: o.fotos || [], vorOrt: o.vorOrt || {},
     kontakte: o.kontakt && o.kontakt.name ? [o.kontakt] : [],
     next: { datum: M.tag(1), zeit: null, text: o.stufe === 'eigentuemer' ? 'Eigentümer nachfassen' : 'Eigentümer ansprechen' },
     erfasst: { wer, zeit: new Date().toTimeString().slice(0, 5), datum: M.HEUTE, quelle: o.quelle, genau: o.genau || null }
