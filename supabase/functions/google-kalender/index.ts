@@ -1,4 +1,5 @@
-// LUMIO CRM ↔ Google Kalender.
+// LUMIO CRM ↔ Google Kalender und Gmail.
+// Gmail: Jeder sieht und schreibt nur aus seinem eigenen Postfach (auch die Geschäftsführung nicht in fremde).
 // Jede Person verbindet einmal ihren eigenen Google-Kalender (Google-Anmeldung, interne Workspace-App).
 // Der Zugangsschlüssel (Refresh-Token) liegt verschlüsselt im Supabase-Vault und verlässt den Server nie.
 // Rechte:
@@ -17,7 +18,8 @@ const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const RUECKRUF = `${SUPABASE_URL}/functions/v1/google-kalender/rueckruf`;
 const ZONE = "Europe/Berlin";
-const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy"];
+const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy",
+  "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"];
 const ZIEL_ROLLEN = ["gf", "closer"]; // in deren Kalender dürfen Closing-Termine eingetragen werden
 
 const CORS = {
@@ -70,6 +72,26 @@ async function google(pid: string, pfad: string, init: RequestInit = {}) {
   return d;
 }
 
+async function gmail(pid: string, pfad: string, init: RequestInit = {}) {
+  const t = await zugang(pid);
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me" + pfad, { ...init, headers: { ...(init.headers || {}), Authorization: "Bearer " + t, "Content-Type": "application/json" } });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 403 && /scope|insufficient/i.test(JSON.stringify(d))) throw new Fehler("Gmail ist für dich noch nicht freigeschaltet. Bitte unter „Kalender“ Google trennen und neu verbinden.", 409);
+  if (!r.ok) throw new Fehler("Gmail: " + (d?.error?.message || r.status), 502);
+  return d;
+}
+const mailOk = (x: unknown) => typeof x === "string" && /^[^@\s<>"(),;:]+@[^@\s<>"(),;:]+\.[^@\s<>"(),;:]+$/.test(x.trim());
+const kopf = (m: any, n: string) => (m.payload?.headers || []).find((h: any) => h.name.toLowerCase() === n.toLowerCase())?.value || "";
+// Betreff und Namen mit Umlauten sicher kodieren (RFC 2047)
+function b64(t: string) {
+  const bytes = new TextEncoder().encode(t); let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+const kodiert = (t: string) => /^[\x20-\x7e]*$/.test(t) ? t : `=?UTF-8?B?${b64(t)}?=`;
+const b64url = (t: string) => b64(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function zeilenUmbruch(t: string) { return b64(t).replace(/.{1,76}/g, (x) => x + "\r\n") }
+
 /* ---------- Wer fragt? ---------- */
 async function anrufer(req: Request) {
   const auth = req.headers.get("Authorization") ?? "";
@@ -96,9 +118,9 @@ h1{font-size:18px;margin:0 0 8px}p{font-size:14px;color:#556;margin:0}</style></
 }
 async function rueckruf(url: URL) {
   const code = url.searchParams.get("code"), state = url.searchParams.get("state") || "";
-  if (url.searchParams.get("error")) return seite("Abgebrochen", "Der Kalender wurde nicht verbunden. Du kannst dieses Fenster schließen.", false);
+  if (url.searchParams.get("error")) return seite("Abgebrochen", "Google wurde nicht verbunden. Du kannst dieses Fenster schließen.", false);
   const a = await sql`delete from public.google_anfrage where state = ${state} and erstellt_am > now() - interval '15 minutes' returning profil_id`;
-  if (!code || !a.length) return seite("Link abgelaufen", "Bitte in der LUMIO-App nochmal auf „Google-Kalender verbinden“ tippen.", false);
+  if (!code || !a.length) return seite("Link abgelaufen", "Bitte in der LUMIO-App nochmal auf „Google verbinden“ tippen.", false);
   const pid = a[0].profil_id as string;
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -107,7 +129,7 @@ async function rueckruf(url: URL) {
   const d = await r.json();
   if (!r.ok || !d.refresh_token) return seite("Hat nicht geklappt", "Google hat keinen dauerhaften Zugang erteilt. Bitte nochmal verbinden und alle Häkchen setzen.", false);
   const fehlend = SCOPES.filter((s) => s.startsWith("https://") && !String(d.scope || "").includes(s));
-  if (fehlend.length) return seite("Häkchen fehlt", "Bitte beim Verbinden den Kalender-Zugriff erlauben (alle Häkchen setzen).", false);
+  if (fehlend.length) return seite("Häkchen fehlt", "Bitte beim Verbinden den Zugriff auf Kalender und Gmail erlauben (alle Häkchen setzen).", false);
   // E-Mail aus dem ID-Token (kommt direkt von Google über die verschlüsselte Verbindung)
   let email = "";
   try { email = JSON.parse(atob(d.id_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).email || "" } catch (_) {}
@@ -115,7 +137,7 @@ async function rueckruf(url: URL) {
   zugangsCache.set(pid, { token: d.access_token, bis: Date.now() + (d.expires_in || 3000) * 1000 });
   await sql`insert into public.google_verbindung (profil_id, google_email, verbunden_am, zuletzt_ok, fehler) values (${pid}, ${email}, now(), now(), null)
     on conflict (profil_id) do update set google_email = excluded.google_email, verbunden_am = now(), zuletzt_ok = now(), fehler = null`;
-  return seite("Kalender verbunden", `${email || "Dein Kalender"} ist jetzt mit der LUMIO-App verbunden. Dieses Fenster schließt sich gleich.`, true);
+  return seite("Google verbunden", `${email || "Dein Konto"} ist jetzt mit der LUMIO-App verbunden (Kalender und Gmail). Dieses Fenster schließt sich gleich.`, true);
 }
 
 /* ---------- Aktionen ---------- */
@@ -223,6 +245,46 @@ async function aktion(ich: { id: string; name: string; rolle: string }, b: any) 
       if (!e || !e.extendedProperties?.private?.lumio_gesetzt_von) return { ok: false };
       await google(z.id, `/calendars/primary/events/${encodeURIComponent(b.event)}?sendUpdates=${b.benachrichtigen ? "all" : "none"}`, { method: "DELETE" });
       return { ok: true };
+    }
+    case "mails": {
+      // Nur das eigene Postfach: Verläufe mit den Adressen der Ansprechpartner eines Leads
+      const adressen = (Array.isArray(b.adressen) ? b.adressen : []).filter(mailOk).map((a: string) => a.trim().toLowerCase()).slice(0, 10);
+      if (!adressen.length) return { verlaeufe: [] };
+      const v = (await team()).find((p: any) => p.id === ich.id);
+      if (!v?.google_email) return { verbunden: false, verlaeufe: [] };
+      const teil = adressen.map((a: string) => `"${a}"`).join(" OR ");
+      const q = new URLSearchParams({ q: `{from:(${teil}) to:(${teil}) cc:(${teil})}`, maxResults: "15" });
+      const liste = await gmail(ich.id, `/threads?${q}`);
+      const verlaeufe = await Promise.all((liste.threads || []).map(async (t: any) => {
+        const d = await gmail(ich.id, `/threads/${t.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`);
+        const msgs = d.messages || [], erste = msgs[0] || {}, letzte = msgs[msgs.length - 1] || {};
+        return {
+          id: t.id, betreff: kopf(erste, "Subject") || "(ohne Betreff)", von: kopf(letzte, "From"), an: kopf(letzte, "To"),
+          datum: letzte.internalDate ? new Date(Number(letzte.internalDate)).toISOString() : null,
+          auszug: letzte.snippet || "", anzahl: msgs.length, ungelesen: msgs.some((m: any) => (m.labelIds || []).includes("UNREAD")),
+          gesendet: (letzte.labelIds || []).includes("SENT"),
+          link: `https://mail.google.com/mail/?authuser=${encodeURIComponent(v.google_email)}#all/${t.id}`,
+        };
+      }));
+      verlaeufe.sort((a: any, z: any) => String(z.datum).localeCompare(String(a.datum)));
+      return { verbunden: true, email: v.google_email, verlaeufe };
+    }
+    case "senden": {
+      // Wird nur durch einen Klick der Person in der App ausgelöst; Absender ist immer das eigene Postfach
+      const v = (await team()).find((p: any) => p.id === ich.id);
+      if (!v?.google_email) throw new Fehler("Verbinde zuerst Google unter „Kalender“.", 409);
+      if (!mailOk(b.an)) throw new Fehler("Die Empfänger-Adresse stimmt nicht.");
+      const an = String(b.an).trim();
+      const gesperrt = await sql`select 1 from public.sperrliste where lower(email) = ${an.toLowerCase()} limit 1`;
+      if (gesperrt.length) throw new Fehler("Diese Adresse steht auf der Sperrliste. Bitte nicht anschreiben.", 409);
+      const betreff = String(b.betreff || "").trim().slice(0, 250), text = String(b.text || "").slice(0, 20000);
+      if (!betreff || !text.trim()) throw new Fehler("Betreff und Text dürfen nicht leer sein.");
+      const roh = [
+        `From: ${kodiert(ich.name)} <${v.google_email}>`, `To: ${an}`, `Subject: ${kodiert(betreff)}`,
+        "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", zeilenUmbruch(text),
+      ].join("\r\n");
+      const d = await gmail(ich.id, "/messages/send", { method: "POST", body: JSON.stringify({ raw: b64url(roh), threadId: b.verlauf || undefined }) });
+      return { id: d.id, verlauf: d.threadId };
     }
   }
   throw new Fehler("Unbekannte Aktion");

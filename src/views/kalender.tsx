@@ -85,20 +85,20 @@ function Verbindung({ stand, onNeu }: { stand: KalStand; onNeu: () => void }) {
   const ich = stand.team.find((p) => p.id === ui.ich)
   const [laeuft, setLaeuft] = React.useState(false)
   if (!stand.eingerichtet) return (
-    <Card><CardHeader><CardTitle>Google Kalender</CardTitle>
-      <CardDescription>{ui.istGF ? "Die Google-Anbindung ist gebaut, aber der Google-Cloud-Zugang fehlt noch. Sobald er in Supabase eingetragen ist, kann sich jeder hier verbinden." : "Die Google-Anbindung wird gerade eingerichtet. Danach kannst du hier deinen Kalender verbinden."}</CardDescription>
+    <Card><CardHeader><CardTitle>Google Kalender und Gmail</CardTitle>
+      <CardDescription>{ui.istGF ? "Die Google-Anbindung ist gebaut, aber der Google-Cloud-Zugang fehlt noch. Sobald er in Supabase eingetragen ist, kann sich jeder hier verbinden." : "Die Google-Anbindung wird gerade eingerichtet. Danach kannst du hier Kalender und Gmail verbinden."}</CardDescription>
     </CardHeader></Card>
   )
   const los = async () => { setLaeuft(true); try { await verbinden() } catch (e: any) { toast(e.message) } finally { setLaeuft(false) } }
-  const aus = async () => { setLaeuft(true); try { await trennen(); toast("Kalender getrennt"); onNeu() } catch (e: any) { toast(e.message) } finally { setLaeuft(false) } }
+  const aus = async () => { setLaeuft(true); try { await trennen(); toast("Google getrennt"); onNeu() } catch (e: any) { toast(e.message) } finally { setLaeuft(false) } }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Dein Google Kalender</CardTitle>
-        <CardDescription>{ich?.verbunden ? <>Verbunden mit <b>{ich.email}</b>. Closing-Termine landen automatisch darin.</> : "Einmal verbinden, dann sehen Setter deine freien Zeiten und tragen Closing-Termine direkt bei dir ein."}</CardDescription>
+        <CardTitle>Dein Google-Konto</CardTitle>
+        <CardDescription>{ich?.verbunden ? <>Verbunden mit <b>{ich.email}</b>. Closing-Termine landen in deinem Kalender, und im Lead siehst du deine E-Mails mit den Ansprechpartnern.</> : "Einmal verbinden: Setter sehen deine freien Zeiten und tragen Closing-Termine bei dir ein, und im Lead siehst und schreibst du E-Mails aus deinem Postfach."}</CardDescription>
         <CardAction>{ich?.verbunden
           ? <Button variant="ghost" size="sm" onClick={aus} disabled={laeuft}><Unplug />Trennen</Button>
-          : <Button size="sm" onClick={los} disabled={laeuft}>{laeuft ? <Loader2 className="animate-spin" /> : <CalendarDays />}Google Kalender verbinden</Button>}</CardAction>
+          : <Button size="sm" onClick={los} disabled={laeuft}>{laeuft ? <Loader2 className="animate-spin" /> : <CalendarDays />}Google verbinden</Button>}</CardAction>
       </CardHeader>
       {ui.istGF && (
         <CardContent className="flex flex-wrap gap-2">

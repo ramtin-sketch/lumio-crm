@@ -17,6 +17,7 @@ import * as M from "@/model/model.js"
 import { toast } from "sonner"
 import { PapierkorbDialog } from "@/papierkorb-dialog"
 import { VorOrtCheck } from "@/vor-ort-check"
+import { LeadMails } from "@/lead-mails"
 import * as V from "@/model/vorort.js"
 import { Map as MapIcon, Mail, Navigation, Phone, ShieldBan, Trash2, UserPlus } from "lucide-react"
 
@@ -228,6 +229,8 @@ function Inhalt({ l }: { l: any }) {
             </form>
           )}
         </Abschnitt>
+
+        {l.name !== "[gelöscht]" && <Abschnitt titel="E-Mails"><LeadMails l={l} /></Abschnitt>}
 
         <Abschnitt titel="Verlauf">
           <form className="flex gap-2" onSubmit={(e) => { const w = form(e); if (!w.text) return; aendern(() => M.verlauf(l, ui.ich, "notiz", w.text), "Notiert"); e.currentTarget.reset() }}>

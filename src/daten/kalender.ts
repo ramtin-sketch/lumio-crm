@@ -6,11 +6,11 @@ import { sperreKurzAussetzen } from "@/app-sperre"
 export type KalTermin = { id: string; titel: string; start: string; ende: string; ganztags: boolean; ort?: string | null; link?: string | null; meet?: string | null; teilnehmer?: string[]; belegt?: boolean }
 export type KalStand = { eingerichtet: boolean; team: { id: string; name: string; rolle: string; verbunden: boolean; email: string | null }[] }
 
-async function rufen(body: any) {
-  if (!ECHT) throw new Error("Im Demo-Modus gibt es keine Kalender-Verbindung.")
+export async function rufen(body: any) {
+  if (!ECHT) throw new Error("Im Demo-Modus gibt es keine Google-Verbindung.")
   const { data, error } = await sb.functions.invoke("google-kalender", { body })
   if (error) {
-    let text = "Kalender gerade nicht erreichbar."
+    let text = "Google gerade nicht erreichbar."
     try { const j = await (error as any).context?.json?.(); if (j?.fehler) text = j.fehler } catch (e) {}
     throw new Error(text)
   }
