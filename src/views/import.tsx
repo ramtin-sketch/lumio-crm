@@ -42,7 +42,12 @@ function csvLesen(text: string): string[][] {
   return zeilen.map((z) => z.map((x) => x.trim()))
 }
 function csvSchreiben(kopf: string[], zeilen: any[][]) {
-  const q = (v: any) => { const s = v === null || v === undefined ? "" : String(v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
+  const q = (v: any) => {
+    let s = v === null || v === undefined ? "" : String(v)
+    // Formel-Einschleusung verhindern: Excel führt Zellen mit = + - @ am Anfang als Formel aus
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s
+    return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
   return "﻿" + [kopf, ...zeilen].map((z) => z.map(q).join(";")).join("\r\n")
 }
 function herunterladen(name: string, inhalt: string) {
