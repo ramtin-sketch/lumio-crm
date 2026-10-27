@@ -49,7 +49,10 @@ export async function teamTermine(von: Date, bis: Date, personen?: string[]): Pr
   const schluessel = von.toISOString() + bis.toISOString() + (personen || []).join(",")
   const c = terminCache.get(schluessel)
   if (c && Date.now() - c.zeit < 120000) return c.wert
-  const { kalender } = await rufen({ aktion: "termine", von: von.toISOString(), bis: bis.toISOString(), personen })
+  const roh = await rufen({ aktion: "termine", von: von.toISOString(), bis: bis.toISOString(), personen })
+  // Links aus fremden Einladungen nur übernehmen, wenn sie mit https:// beginnen
+  const sicher = (u?: string | null) => (typeof u === "string" && /^https:\/\//i.test(u) ? u : null)
+  const kalender = (roh.kalender || []).map((k: any) => ({ ...k, termine: (k.termine || []).map((t: any) => ({ ...t, meet: sicher(t.meet), link: sicher(t.link) })) }))
   terminCache.set(schluessel, { wert: kalender, zeit: Date.now() })
   return kalender
 }

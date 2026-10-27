@@ -5,6 +5,9 @@ import * as K from "@/model/karte.js"
 import * as M from "@/model/model.js"
 import { cn } from "@/lib/utils"
 
+/* Text, der in Leaflet als HTML landet (Tooltips, Beschriftungen), immer entschärfen */
+const h = (x: unknown) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+
 /* Straßenkarte (CARTO/OpenStreetMap). In der Vorschau blockiert, dann zeichnen wir nur die Grenzen. */
 let KACHELN: "?" | "ok" | "aus" = "?"
 const hoerer = new Set<(s: typeof KACHELN) => void>()
@@ -119,13 +122,13 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
     if (stadt === "kiel") {
       if (z < 10.5) return
       Object.entries(K.KIEL as Record<string, number[]>).forEach(([n, p]) => g.addLayer(L.marker([p[0], p[1]], { interactive: false, keyboard: false,
-        icon: L.divIcon({ className: "lumio-label", html: `<span>${n.replace("Kiel-", "")}</span>`, iconSize: [0, 0] }) })))
+        icon: L.divIcon({ className: "lumio-label", html: `<span>${h(n.replace("Kiel-", ""))}</span>`, iconSize: [0, 0] }) })))
       return
     }
     if (z < 12.5) return
     units.forEach((u: any) => {
       g.addLayer(L.marker(labelPunkt(u), { interactive: false, keyboard: false,
-        icon: L.divIcon({ className: "lumio-label", html: `<span>${u.name}</span>`, iconSize: [0, 0] }) }))
+        icon: L.divIcon({ className: "lumio-label", html: `<span>${h(u.name)}</span>`, iconSize: [0, 0] }) }))
     })
   }
 
@@ -149,7 +152,7 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
       if (gewaehlt) Object.assign(st, { color: P.ink, weight: 2.5, opacity: 1, dashArray: undefined })
       const poly = L.polygon(u.g, { ...st, interactive: !klein, bubblingMouseEvents: false })
       if (!klein) {
-        poly.bindTooltip(`<b>${u.name}</b><br>${hv ? M.person(hv).voll : "frei, noch kein Vertriebler"}`, { sticky: true, direction: "top", className: "lumio-tip" })
+        poly.bindTooltip(`<b>${h(u.name)}</b><br>${h(hv ? M.person(hv).voll : "frei, noch kein Vertriebler")}`, { sticky: true, direction: "top", className: "lumio-tip" })
         poly.on("click", () => cb.current.onUnit?.(u.id))
       }
       g.addLayer(poly)
@@ -170,14 +173,14 @@ export function GebietsKarte({ stadt, leads, version, auswahl, onUnit, onLead, h
         interactive: !klein, bubblingMouseEvents: false, pane: "pins",
       })
       if (!klein) {
-        c.bindTooltip(`<b>${l.name}</b><br>${M.stufeVon(l).name} · ${M.person(l.betreuer)?.name ?? ""}`, { direction: "top", offset: [0, -6], className: "lumio-tip" })
+        c.bindTooltip(`<b>${h(l.name)}</b><br>${h(M.stufeVon(l).name)} · ${h(M.person(l.betreuer)?.name ?? "")}`, { direction: "top", offset: [0, -6], className: "lumio-tip" })
         c.on("click", () => cb.current.onLead?.(l.id))
       }
       g.addLayer(c)
     })
     ;(objekte || []).forEach((o) => {
       const c = L.circleMarker([o.geo.lat, o.geo.lng], { radius: o.radius || 7, color: dunkel ? "#0a0f1c" : "#ffffff", weight: 2, fillColor: o.farbe, fillOpacity: 1, pane: "pins", interactive: !klein, bubblingMouseEvents: false })
-      if (!klein) { c.bindTooltip(o.titel, { direction: "top", offset: [0, -6], className: "lumio-tip" }); c.on("click", () => cb.current.onObjekt?.(o.id)) }
+      if (!klein) { c.bindTooltip(h(o.titel), { direction: "top", offset: [0, -6], className: "lumio-tip" }); c.on("click", () => cb.current.onObjekt?.(o.id)) }
       g.addLayer(c)
     })
     if (punkt) {
