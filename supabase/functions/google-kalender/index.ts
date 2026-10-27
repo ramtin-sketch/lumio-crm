@@ -19,7 +19,8 @@ const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const RUECKRUF = `${SUPABASE_URL}/functions/v1/google-kalender/rueckruf`;
 const ZONE = "Europe/Berlin";
 const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy",
-  "https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.send"];
+  "https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/drive.file"]; // drive.file: nur Dateien, die das CRM selbst anlegt (Sicherungen)
 const ZIEL_ROLLEN = ["gf", "closer"]; // in deren Kalender dürfen Closing-Termine eingetragen werden
 
 const CORS = {
@@ -165,7 +166,7 @@ async function rueckruf(url: URL) {
   const d = await r.json();
   if (!r.ok || !d.refresh_token) return seite("Hat nicht geklappt", "Google hat keinen dauerhaften Zugang erteilt. Bitte nochmal verbinden und alle Häkchen setzen.", false);
   const fehlend = SCOPES.filter((s) => s.startsWith("https://") && !String(d.scope || "").includes(s));
-  if (fehlend.length) return seite("Häkchen fehlt", "Bitte beim Verbinden den Zugriff auf Kalender und Gmail erlauben (alle Häkchen setzen).", false);
+  if (fehlend.length) return seite("Häkchen fehlt", "Bitte beim Verbinden alle Häkchen setzen (Kalender, Gmail und Drive für die Sicherungen).", false);
   // E-Mail aus dem ID-Token (kommt direkt von Google über die verschlüsselte Verbindung)
   let email = "";
   try { email = JSON.parse(atob(d.id_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).email || "" } catch (_) {}

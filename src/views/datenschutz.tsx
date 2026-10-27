@@ -9,10 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Seitenkopf } from "@/bits"
 import { bump, useDaten, useUI } from "@/store"
-import { protokollLaden, hinweiseLaden, anmeldungenLaden, sicherungenLaden, sicherungErstellen, sicherungHerunterladen, ABMELDEN_NACH_STUNDEN, claudeStand, claudeEinrichten, claudeSperren } from "@/daten/echt"
+import { protokollLaden, hinweiseLaden, anmeldungenLaden, sicherungenLaden, sicherungErstellen, sicherungHerunterladen, externSichern, sicherungEntschluesseln, ABMELDEN_NACH_STUNDEN, claudeStand, claudeEinrichten, claudeSperren } from "@/daten/echt"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
-import { AlertTriangle, CheckCircle2, Copy, Download, Info, Loader2, ShieldBan, DatabaseBackup, Bot, Ban } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Copy, Download, Info, Loader2, ShieldBan, DatabaseBackup, Bot, Ban, CloudUpload, KeyRound, FileLock } from "lucide-react"
 
 const GRUENDE = ["Werbewiderspruch", "Will keine Anrufe", "Wunsch des Kunden", "Falsche Nummer", "Sonstiges"]
 const TABELLEN: Record<string, string> = { claude_schluessel: "Claude-Verbindung", lead: "Lead", kontakt: "Ansprechpartner", abschluss: "Abschluss", mandat: "Mandat", gebiet: "Gebiet", sperrliste: "Sperrliste", profil: "Zugang", profil_vorbelegung: "Zugang" }
@@ -175,6 +175,7 @@ function Sicherheit() {
     <div className="grid gap-4 xl:grid-cols-2">
       <Hinweise echt={ui.echt} />
       <Sicherungen echt={ui.echt} />
+      <SicherungExtern echt={ui.echt} />
       <Anmeldungen echt={ui.echt} />
       <ClaudeVerbindung echt={ui.echt} />
     </div>
@@ -232,7 +233,7 @@ function Sicherungen({ echt }: { echt: boolean }) {
                   <TableRow key={z.id}>
                     <TableCell className="whitespace-nowrap"><div className="tabular text-sm">{zeitText(z.erstellt_am)}</div><div className="text-xs text-muted-foreground">{z.art}{z.groesse_kb ? " · " + z.groesse_kb + " KB" : ""}</div></TableCell>
                     <TableCell className="hidden whitespace-normal text-sm text-muted-foreground sm:table-cell">{umfang(z.tabellen)}</TableCell>
-                    <TableCell>{z.groesse_kb ? <Button variant="ghost" size="icon" className="size-8" aria-label="Sicherung herunterladen" disabled={laeuft === String(z.id)}
+                    <TableCell>{String(z.art || "").startsWith("extern") ? <span className="text-xs text-muted-foreground">im Drive</span> : z.groesse_kb ? <Button variant="ghost" size="icon" className="size-8" aria-label="Sicherung herunterladen" disabled={laeuft === String(z.id)}
                       onClick={async () => { setLaeuft(String(z.id)); try { await sicherungHerunterladen(z.id) } catch (e: any) { toast(e.message) } finally { setLaeuft(null) } }}>
                       {laeuft === String(z.id) ? <Loader2 className="animate-spin" /> : <Download />}</Button> : <span className="text-xs text-muted-foreground">abgelaufen</span>}</TableCell>
                   </TableRow>
@@ -240,6 +241,49 @@ function Sicherungen({ echt }: { echt: boolean }) {
                 {!daten.length && <TableRow><TableCell colSpan={3} className="py-8 text-center text-muted-foreground">Noch keine Sicherung.</TableCell></TableRow>}
               </TableBody>
             </Table>}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* Wöchentlich verschlüsselt ins Google Drive; öffnen nur mit dem privaten Schlüssel */
+function SicherungExtern({ echt }: { echt: boolean }) {
+  const [letzte, setLetzte] = React.useState<any | null | undefined>(undefined)
+  const [laeuft, setLaeuft] = React.useState<null | "sichern" | "oeffnen">(null)
+  const [datei, setDatei] = React.useState<File | null>(null)
+  const [schluessel, setSchluessel] = React.useState<File | null>(null)
+  const [ergebnis, setErgebnis] = React.useState<string | null>(null)
+  const laden = React.useCallback(() => { if (echt) sicherungenLaden().then((d) => setLetzte(d.find((z: any) => String(z.art || "").startsWith("extern")) || null)).catch(() => setLetzte(null)) }, [echt])
+  React.useEffect(() => { laden() }, [laden])
+  const alt = letzte && Date.now() - new Date(letzte.erstellt_am).getTime() > 8 * 86400000
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
+        <div className="grid gap-1.5"><CardTitle>Sicherung außer Haus</CardTitle>
+          <CardDescription>Jeden Sonntag um 3 Uhr landet eine verschlüsselte Kopie aller CRM-Daten in deinem Google Drive (Ordner „LUMIO CRM Sicherungen“, die letzten 12 Wochen). Öffnen geht nur mit deinem privaten Schlüssel. Fotos sind nicht enthalten.</CardDescription></div>
+        <Button size="sm" variant="outline" disabled={!echt || laeuft === "sichern"} onClick={async () => {
+          setLaeuft("sichern"); try { const r = await externSichern(); toast("Gesichert: " + r.datei, { description: "Im Drive von " + r.drive + " · " + r.groesse_kb + " KB" }); laden() } catch (e: any) { toast(e.message) } finally { setLaeuft(null) }
+        }}>{laeuft === "sichern" ? <Loader2 className="animate-spin" /> : <CloudUpload />}Jetzt ins Drive</Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!echt ? <NurEcht text="In der Demo gibt es keine Sicherungen außer Haus." />
+          : letzte === undefined ? <Laedt />
+          : letzte === null ? <p className="text-sm text-warn">Noch keine Sicherung im Drive.</p>
+          : <p className={"flex items-center gap-2 text-sm " + (alt ? "text-warn" : "text-muted-foreground")}>{alt ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4 text-ok" />}Letzte Sicherung im Drive: {zeitText(letzte.erstellt_am)}{letzte.groesse_kb ? " · " + letzte.groesse_kb + " KB" : ""}{alt ? " · älter als eine Woche" : ""}</p>}
+        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+          <div className="text-sm font-medium">Sicherung öffnen</div>
+          <p className="text-xs text-muted-foreground">Die .lumio-Datei aus dem Drive und deinen privaten Schlüssel wählen. Entschlüsselt wird nur hier im Browser, nichts wird hochgeladen.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm"><label className="cursor-pointer"><FileLock />{datei ? datei.name.slice(0, 28) : "Sicherung (.lumio)"}<input type="file" accept=".lumio,application/json,application/octet-stream" className="sr-only" onChange={(e) => { setDatei(e.target.files?.[0] || null); setErgebnis(null); e.target.value = "" }} /></label></Button>
+            <Button asChild variant="outline" size="sm"><label className="cursor-pointer"><KeyRound />{schluessel ? "Schlüssel gewählt" : "Privater Schlüssel (.pem)"}<input type="file" accept=".pem,.txt" className="sr-only" onChange={(e) => { setSchluessel(e.target.files?.[0] || null); setErgebnis(null); e.target.value = "" }} /></label></Button>
+            <Button size="sm" disabled={!datei || !schluessel || laeuft === "oeffnen"} onClick={async () => {
+              setLaeuft("oeffnen")
+              try { const z = await sicherungEntschluesseln(await datei!.text(), await schluessel!.text()); setErgebnis(M.plural(z.lead || 0, "Lead", "Leads") + ", " + M.plural(z.kontakt || 0, "Ansprechpartner", "Ansprechpartner") + " · als JSON heruntergeladen") }
+              catch (e: any) { toast(e.message) } finally { setLaeuft(null) }
+            }}>{laeuft === "oeffnen" ? <Loader2 className="animate-spin" /> : <Download />}Entschlüsseln</Button>
+          </div>
+          {ergebnis && <p className="flex items-center gap-2 text-xs text-ok"><CheckCircle2 className="size-3.5" />{ergebnis}</p>}
+        </div>
       </CardContent>
     </Card>
   )

@@ -496,6 +496,40 @@ export async function sicherungHerunterladen(id: number) {
   a.href = URL.createObjectURL(new Blob([JSON.stringify({ erstellt_am: data.erstellt_am, ...data.daten }, null, 1)], { type: "application/json" }))
   a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
+/* ---------- Sicherung außer Haus (Google Drive, verschlüsselt) ---------- */
+export async function externSichern(): Promise<{ datei: string; drive: string; groesse_kb: number }> {
+  const { data, error } = await sb.functions.invoke("sicherung-extern", { body: {} })
+  if (error) {
+    let text = "Sicherung gerade nicht möglich."
+    try { const j = await (error as any).context?.json?.(); if (j?.fehler) text = j.fehler } catch (e) {}
+    throw new Error(text)
+  }
+  if (data?.fehler) throw new Error(data.fehler)
+  return data
+}
+/* Entschlüsselt eine .lumio-Datei mit dem privaten Schlüssel, nur hier im Browser. Nichts davon geht ins Netz. */
+export async function sicherungEntschluesseln(dateiText: string, schluesselText: string) {
+  const ausB64 = (t: string) => Uint8Array.from(atob(t), (c) => c.charCodeAt(0))
+  let d: any
+  try { d = JSON.parse(dateiText) } catch (e) { throw new Error("Das ist keine LUMIO-Sicherung (.lumio-Datei).") }
+  if (d?.format !== "lumio-sicherung") throw new Error("Das ist keine LUMIO-Sicherung (.lumio-Datei).")
+  const pem = schluesselText.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "")
+  let priv: CryptoKey
+  try { priv = await crypto.subtle.importKey("pkcs8", ausB64(pem) as BufferSource, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]) }
+  catch (e) { throw new Error("Der Schlüssel passt nicht. Bitte die Datei lumio-sicherung-privat.pem wählen.") }
+  let gz: ArrayBuffer
+  try {
+    const roh = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, priv, ausB64(d.schluessel) as BufferSource)
+    const aes = await crypto.subtle.importKey("raw", roh, { name: "AES-GCM" }, false, ["decrypt"])
+    gz = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ausB64(d.iv) as BufferSource }, aes, ausB64(d.daten) as BufferSource)
+  } catch (e) { throw new Error("Entschlüsseln hat nicht geklappt: falscher Schlüssel oder beschädigte Datei.") }
+  const text = await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"))).text()
+  const inhalt = JSON.parse(text)
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(inhalt, null, 1)], { type: "application/json" }))
+  a.download = "LUMIO-Sicherung-entschluesselt-" + String(inhalt.erstellt || "").slice(0, 10) + ".json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  return Object.fromEntries(Object.entries(inhalt.tabellen || {}).map(([k, v]: any) => [k, (v || []).length])) as Record<string, number>
+}
 export async function exportMelden(art: string, anzahl: number) {
   if (!ECHT) return
   try { await sb.rpc("export_melden", { p_art: art, p_anzahl: anzahl }) } catch (e) {}
