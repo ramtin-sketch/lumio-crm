@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { PersonAvatar } from "@/bits"
 import { bump, useUI } from "@/store"
-import { zugang, teamSicherheit, pflichtSetzen } from "@/daten/echt"
+import { zugang, teamSicherheit } from "@/daten/echt"
 import * as K from "@/model/karte.js"
 import * as M from "@/model/model.js"
 import { toast } from "sonner"
@@ -36,10 +36,6 @@ export function Zugaenge() {
   async function zfZuruecksetzen(p: any) {
     if (!nichtDemo()) return
     try { await zugang({ aktion: "zweifaktor_zuruecksetzen", id: p.id }); sicherLaden(); toast(p.voll + " richtet die Zwei-Faktor-Anmeldung beim nächsten Anmelden neu ein" + (sicher[p.id]?.pflicht ? "." : ", falls gewünscht.")) } catch (e: any) { toast(e.message) }
-  }
-  async function zfPflicht(p: any, wert: boolean) {
-    if (!nichtDemo()) return
-    try { await pflichtSetzen(p.id, wert); sicherLaden(); toast(wert ? "Zwei-Faktor ist jetzt Pflicht für " + p.voll : "Zwei-Faktor ist für " + p.voll + " freiwillig") } catch (e: any) { toast(e.message) }
   }
   const zfBadge = (p: any) => {
     const z = sicher[p.id]
@@ -88,9 +84,6 @@ export function Zugaenge() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => passwort(p)}><KeyRound />Neues Startpasswort</DropdownMenuItem>
                         {sicher[p.id]?.hat_faktor && <DropdownMenuItem onClick={() => zfZuruecksetzen(p)}><Smartphone />Zwei-Faktor zurücksetzen (Handy verloren)</DropdownMenuItem>}
-                        {p.rolle !== "gf" && ui.echt && (sicher[p.id]?.pflicht
-                          ? <DropdownMenuItem onClick={() => zfPflicht(p, false)}><ShieldOff />Zwei-Faktor freiwillig machen</DropdownMenuItem>
-                          : <DropdownMenuItem onClick={() => zfPflicht(p, true)}><ShieldCheck />Zwei-Faktor zur Pflicht machen</DropdownMenuItem>)}
                         {p.aktiv === false
                           ? <DropdownMenuItem onClick={() => aktiv(p, true)}><UserCheck />Wieder freischalten</DropdownMenuItem>
                           : <DropdownMenuItem onClick={() => aktiv(p, false)} className="text-destructive"><UserX />Zugang sperren</DropdownMenuItem>}
